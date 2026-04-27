@@ -99,7 +99,7 @@ if net and db:
                         
                         # If route is floating ABOVE the hallways, decrease y_offset (e.g., -500)
                         # If route is floating BELOW the hallways, increase y_offset (e.g., 500)
-                        y_offset = -1,000 # Nudging the image down slightly based on your screenshot
+                        y_offset = -800 # Nudging the image down slightly based on your screenshot
                         
                         # Apply the offsets to the image placement
                         y_center = dy_min + (cad_h / 2)
