@@ -73,37 +73,34 @@ if net and db:
                     st.code(result, language="markdown")
                 
                 with map_col:
-                    st.markdown(f"### 🗺️ Network Topology: {view_floor}")
+                    st.markdown(f"### 🗺️ Topological Network: {view_floor}")
                     
                     try:
-                        # Get the bounds for the selected floor to filter the nodes
+                        # Filter for the current floor's coordinates
                         x0, x1, y0, y1 = floor_data[view_floor]["bounds"]
-                        
                         fig = go.Figure()
 
-                        # 1. GATHER ALL ROOMS ON THIS SPECIFIC FLOOR
-                        floor_nodes_x = []
-                        floor_nodes_y = []
-                        floor_node_names = []
+                        # 1. GATHER FLOOR NODES
+                        floor_nodes_x, floor_nodes_y, floor_node_names = [], [], []
                         
                         for name, pos in db.items():
                             if x0 <= pos[0] <= x1 and y0 <= pos[1] <= y1:
                                 floor_nodes_x.append(pos[0])
                                 floor_nodes_y.append(pos[1])
-                                # Only show labels for important rooms to avoid clutter
-                                if any(keyword in name for keyword in ["STAIR", "ELEV", "LOBBY", "ROOM", "WARD"]):
+                                # Only label major waypoints to keep the UI clean
+                                if any(kw in name for kw in ["STAIR", "ELEV", "LOBBY", "ROOM", "WARD", "PHARMACY", "EMERGENCY"]):
                                     floor_node_names.append(name)
                                 else:
                                     floor_node_names.append("")
 
-                        # 2. DRAW THE DIGITAL BLUEPRINT
+                        # 2. DRAW THE NODES (The "Subway Stations")
                         fig.add_trace(go.Scatter(
                             x=floor_nodes_x, y=floor_nodes_y,
                             mode='markers+text',
-                            marker=dict(size=8, color='rgba(100, 150, 250, 0.4)'), # Soft blue nodes
+                            marker=dict(size=10, color='#3498db', line=dict(width=1, color='white')),
                             text=floor_node_names,
                             textposition="bottom center",
-                            textfont=dict(size=9, color="gray"),
+                            textfont=dict(size=10, color="#bdc3c7"),
                             hoverinfo="text",
                             name="Locations"
                         ))
@@ -113,35 +110,38 @@ if net and db:
                             s_node, e_node = db[start_point], db[destination]
                             try:
                                 path = nx.shortest_path(net, s_node, e_node, weight='weight')
-                                x_coords = [p[0] for p in path]
-                                y_coords = [p[1] for p in path]
+                                rx, ry = [p[0] for p in path], [p[1] for p in path]
                                 
+                                # The glowing red path
                                 fig.add_trace(go.Scatter(
-                                    x=x_coords, y=y_coords, mode='lines+markers', 
-                                    line=dict(color='red', width=5), 
-                                    marker=dict(size=10, color='white', line=dict(width=2, color='red')),
+                                    x=rx, y=ry, mode='lines+markers', 
+                                    line=dict(color='#e74c3c', width=4), 
+                                    marker=dict(size=12, color='white', line=dict(width=2, color='#e74c3c')),
                                     name="Optimal Path"
                                 ))
                                 
-                                # Emphasize Start and End
+                                # Start and End Banners
                                 fig.add_trace(go.Scatter(
-                                    x=[x_coords[0], x_coords[-1]], y=[y_coords[0], y_coords[-1]],
+                                    x=[rx[0], rx[-1]], y=[ry[0], ry[-1]],
                                     mode='markers+text', text=["📍 START", "🏁 END"], 
                                     textposition="top center",
                                     textfont=dict(size=14, color="white"),
-                                    marker=dict(size=16, color=['green', 'blue'])
+                                    marker=dict(size=16, color=['#2ecc71', '#3498db'])
                                 ))
                             except nx.NetworkXNoPath:
                                 pass
 
-                        # 4. LOCK THE ASPECT RATIO (No Images = No Glitches)
-                        fig.update_xaxes(visible=False)
-                        fig.update_yaxes(visible=False, scaleanchor="x", scaleratio=1)
+                        # ==========================================
+                        # THE MAGIC FIX: REMOVING THE SCALE ANCHOR
+                        # ==========================================
+                        # Plotly will now auto-stretch the graph to fit the 650px container height perfectly.
+                        fig.update_xaxes(showgrid=False, zeroline=False, visible=False)
+                        fig.update_yaxes(showgrid=False, zeroline=False, visible=False) 
                         
                         fig.update_layout(
                             template="plotly_dark",
-                            height=700,
-                            margin=dict(l=0, r=0, b=0, t=0),
+                            height=650,
+                            margin=dict(l=20, r=20, b=20, t=20),
                             dragmode='pan',
                             showlegend=False
                         )
