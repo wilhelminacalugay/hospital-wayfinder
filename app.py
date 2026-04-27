@@ -17,6 +17,7 @@ st.markdown("### Interactive Decision-Support Dashboard")
 # ==========================================
 @st.cache_resource
 def load_hospital_data():
+    # Ensure 'new block.dxf' is in your GitHub root directory
     return build_hospital_graph("new block.dxf")
 
 with st.spinner("Loading structural network geometry..."):
@@ -25,6 +26,7 @@ with st.spinner("Loading structural network geometry..."):
 # ==========================================
 # THE CALIBRATED MULTI-FLOOR DICTIONARY
 # ==========================================
+# These are the precise bounds you extracted via X-Ray mode
 floor_data = {
     "Lower Ground (LG)": {"img": "lg_floor.png", "bounds": [425133.6, 531137.5, -170844.5, -159463.5]},
     "Upper Ground (UG)": {"img": "ug_floor.png", "bounds": [417942.2, 532554.5, -157112.6, -145093.6]},
@@ -52,6 +54,10 @@ if net and db:
         st.divider()
         calculate_btn = st.button("Calculate Optimal Route", type="primary", use_container_width=True)
 
+    # Floor Selector (Moved outside the IF block to prevent NameErrors)
+    st.markdown("---")
+    view_floor = st.selectbox("👁️ View Floor Map:", options=list(floor_data.keys()), index=1)
+
     if calculate_btn:
         if start_point == destination:
             st.warning("You are already at your destination!")
@@ -59,26 +65,26 @@ if net and db:
             with st.spinner("Calculating multi-objective trade-offs..."):
                 result = find_optimized_paths(net, db, start_point, destination, user_role)
                 
-                text_col, map_col = st.columns([1, 1.5])
+                text_col, map_col = st.columns([1, 2])
                 
                 with text_col:
-                    st.markdown("### Recommended Itineraries")
+                    st.markdown("### Recommended Itinerary")
                     st.success("Routing Complete.")
                     st.code(result, language="markdown")
                 
                 with map_col:
-                    st.markdown(f"### 🗺️ Hospital Map: {view_floor}")
+                    st.markdown(f"### 🗺️ {view_floor}")
                     
                     fig = go.Figure()
                     
                     try:
                         selected_floor = floor_data[view_floor]
                         img_path = selected_floor["img"]
-                        # Use the new precise bounds you found
                         dx_min, dx_max, dy_min, dy_max = selected_floor["bounds"]
                         
                         img = Image.open(img_path)
                         
+                        # Add the background architectural image
                         fig.add_layout_image(
                             dict(
                                 source=img,
@@ -87,31 +93,45 @@ if net and db:
                                 sizex=(dx_max - dx_min),
                                 sizey=(dy_max - dy_min),
                                 sizing="stretch",
-                                opacity=1.0, # Fully visible now!
+                                opacity=1.0,
                                 layer="below"
                             )
                         )
+
+                        # Draw the Route Line
+                        if "SEQUENCE LIST" in result:
+                            s_node = db[start_point]
+                            e_node = db[destination]
+                            try:
+                                path = nx.shortest_path(net, s_node, e_node, weight='weight')
+                                x_coords = [p[0] for p in path]
+                                y_coords = [p[1] for p in path]
+                                
+                                # High-visibility route line
+                                fig.add_trace(go.Scatter(
+                                    x=x_coords, y=y_coords, 
+                                    mode='lines+markers', 
+                                    line=dict(color='red', width=6), 
+                                    marker=dict(size=8, color='white'),
+                                    name="Optimal Path"
+                                ))
+                            except nx.NetworkXNoPath:
+                                st.error("No traversable path found for your role.")
+
+                        # LOCKING THE SCALE: Critical to prevent stretching
+                        fig.update_xaxes(range=[dx_min, dx_max], visible=False)
+                        fig.update_yaxes(range=[dy_min, dy_max], visible=False, scaleanchor="x", scaleratio=1)
+                        
+                        fig.update_layout(
+                            template="plotly_dark", 
+                            height=700, 
+                            margin=dict(l=0, r=0, b=0, t=0),
+                            dragmode='pan'
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
                     except FileNotFoundError:
-                        st.warning(f"Image '{img_path}' not found.")
-
-                    # Draw the Route
-                    if "SEQUENCE LIST" in result:
-                        s_node, e_node = db[start_point], db[destination]
-                        try:
-                            path = nx.shortest_path(net, s_node, e_node, weight='weight')
-                            x_coords = [p[0] for p in path]; y_coords = [p[1] for p in path]
-                            
-                            # Draw the Glowing Route Line
-                            fig.add_trace(go.Scatter(x=x_coords, y=y_coords, mode='lines+markers', 
-                                                     line=dict(color='red', width=6), 
-                                                     marker=dict(size=8, color='white')))
-                        except: pass
-
-                    # Lock Aspect Ratio to prevent "Pancake" effect
-                    fig.update_xaxes(range=[dx_min, dx_max], visible=False)
-                    fig.update_yaxes(range=[dy_min, dy_max], visible=False, scaleanchor="x", scaleratio=1)
-                    fig.update_layout(template="plotly_dark", height=700, margin=dict(l=0,r=0,b=0,t=0))
-                    
-                    st.plotly_chart(fig, use_container_width=True)
+                        st.error(f"Image '{img_path}' not found. Please upload it to your GitHub.")
 else:
     st.error("System Offline: Could not load the hospital map data.")
