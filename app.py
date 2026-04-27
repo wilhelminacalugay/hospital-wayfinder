@@ -73,27 +73,42 @@ if net and db:
                     st.code(result, language="markdown")
                 
                 with map_col:
-                    st.markdown(f"### 🗺️ {view_floor}")
+                    st.markdown(f"### 🗺️ Calibrating: {view_floor}")
                     
                     try:
                         selected_floor = floor_data[view_floor]
                         img_path = selected_floor["img"]
-                        dx_min, dx_max, dy_min, dy_max = selected_floor["bounds"]
+                        
+                        # We only use your West and North coordinates as the "Anchor Point"
+                        # This pins the top-left corner of the image in place.
+                        dx_min = selected_floor["bounds"][0] # West
+                        dy_max = selected_floor["bounds"][3] # North
+                        
+                        # ==========================================
+                        # LIVE CALIBRATION SLIDERS
+                        # ==========================================
+                        st.info("🛠️ **CALIBRATION MODE:** Adjust these sliders until the hallways match the red route line.")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            # We start the width at 15,000 instead of your massive 114,000
+                            img_width = st.slider("↔️ Image Width", min_value=1000, max_value=50000, value=15000, step=100)
+                        with col2:
+                            # We start the height around your recorded 12,000
+                            img_height = st.slider("↕️ Image Height", min_value=1000, max_value=50000, value=12000, step=100)
                         
                         fig = go.Figure()
                         img = Image.open(img_path)
                         
-                        # THE PAPER SPACE FIX:
-                        # We pin the image to the corners of the browser window (0 to 1) 
-                        # instead of pinning it to the 400,000 CAD coordinates.
+                        # Pin the image to the actual map grid (fixes panning!)
                         fig.add_layout_image(
                             dict(
                                 source=img,
-                                xref="paper", yref="paper",
-                                x=0, y=1,         # Start at top-left of the screen
-                                sizex=1, sizey=1, # Fill 100% of the screen
+                                xref="x", yref="y",
+                                x=dx_min, y=dy_max, # Pinned to Top-Left
+                                sizex=img_width,
+                                sizey=img_height,
                                 sizing="stretch",
-                                opacity=1.0,
+                                opacity=0.6, # Semi-transparent so you can see the red lines
                                 layer="below"
                             )
                         )
@@ -105,19 +120,28 @@ if net and db:
                                 path = nx.shortest_path(net, s_node, e_node, weight='weight')
                                 x_coords = [p[0] for p in path]
                                 y_coords = [p[1] for p in path]
+                                
+                                # Draw a bright red line
                                 fig.add_trace(go.Scatter(
                                     x=x_coords, y=y_coords, mode='lines+markers', 
                                     line=dict(color='red', width=6), marker=dict(size=8, color='white')
                                 ))
+                                
+                                # Also draw the Start and End points clearly
+                                fig.add_trace(go.Scatter(
+                                    x=[x_coords[0], x_coords[-1]], y=[y_coords[0], y_coords[-1]],
+                                    mode='markers+text', text=["START", "END"], textposition="top center",
+                                    marker=dict(size=14, color=['green', 'blue'])
+                                ))
                             except: pass
 
-                        # We stretch the invisible math grid to perfectly match the image box
-                        fig.update_xaxes(range=[dx_min, dx_max], visible=False)
-                        fig.update_yaxes(range=[dy_min, dy_max], visible=False)
+                        # THE PANCAKE KILLER: Forces real architectural proportions
+                        fig.update_xaxes(visible=False)
+                        fig.update_yaxes(visible=False, scaleanchor="x", scaleratio=1)
                         
                         fig.update_layout(
                             template="plotly_dark",
-                            height=700, # A nice big 700px tall view window
+                            height=600,
                             margin=dict(l=0, r=0, b=0, t=0),
                             dragmode='pan'
                         )
