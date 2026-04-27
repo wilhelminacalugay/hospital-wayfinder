@@ -75,21 +75,26 @@ if net and db:
                 with map_col:
                     st.markdown(f"### 🗺️ {view_floor}")
                     
-                    fig = go.Figure()
-                    
                     try:
                         selected_floor = floor_data[view_floor]
                         img_path = selected_floor["img"]
                         x0, x1, y0, y1 = selected_floor["bounds"]
                         
-                        # Normalize dimensions
+                        # Calculate geometric dimensions
                         width = x1 - x0
                         height = y1 - y0
                         
+                        # Determine the aspect ratio (Height / Width)
+                        # This tells us if the building is a square (1.0), a landscape (0.5), or a portrait (2.0)
+                        aspect_ratio = height / width
+                        
+                        # Force a physical height for the Streamlit component
+                        # We'll set a base width of 700px for the calculation
+                        plot_height = 700 
+                        
+                        fig = go.Figure()
                         img = Image.open(img_path)
                         
-                        # THE NUCLEAR FIX: 
-                        # We force the image to be the exact "hero" of the plot
                         fig.add_layout_image(
                             dict(
                                 source=img,
@@ -113,24 +118,21 @@ if net and db:
                                                          line=dict(color='red', width=6), marker=dict(size=8, color='white')))
                             except: pass
 
-                        # THE ASPECT RATIO ENFORCER
-                        # We explicitly tell Plotly to match the width of the container
-                        fig.update_xaxes(range=[0, width], showgrid=False, zeroline=False, visible=False)
-                        fig.update_yaxes(range=[0, height], showgrid=False, zeroline=False, visible=False,
-                                         scaleanchor="x", scaleratio=1) # THIS MUST BE 1
+                        # THE LOCK: This is the most rigid way to stop the pancake
+                        fig.update_xaxes(range=[0, width], visible=False, fixedrange=True)
+                        fig.update_yaxes(range=[0, height], visible=False, 
+                                         scaleanchor="x", scaleratio=1, fixedrange=True)
                         
                         fig.update_layout(
                             template="plotly_dark",
-                            height=800, # Increased height
-                            width=None, # Let it fill the column
-                            margin=dict(l=10, r=10, b=10, t=10),
-                            autosize=True,
+                            height=plot_height, # Mandatory pixel height
+                            margin=dict(l=0, r=0, b=0, t=0),
                             dragmode='pan'
                         )
                         
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
                         
                     except Exception as e:
-                        st.error(f"Error loading map: {e}")
+                        st.error(f"Mapping Error: {e}")
 else:
     st.error("System Offline: Could not load the hospital map data.")
