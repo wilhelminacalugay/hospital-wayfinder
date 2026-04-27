@@ -78,19 +78,7 @@ if net and db:
                     try:
                         selected_floor = floor_data[view_floor]
                         img_path = selected_floor["img"]
-                        x0, x1, y0, y1 = selected_floor["bounds"]
-                        
-                        # Calculate geometric dimensions
-                        width = x1 - x0
-                        height = y1 - y0
-                        
-                        # Determine the aspect ratio (Height / Width)
-                        # This tells us if the building is a square (1.0), a landscape (0.5), or a portrait (2.0)
-                        aspect_ratio = height / width
-                        
-                        # Force a physical height for the Streamlit component
-                        # We'll set a base width of 700px for the calculation
-                        plot_height = 700 
+                        dx_min, dx_max, dy_min, dy_max = selected_floor["bounds"]
                         
                         fig = go.Figure()
                         img = Image.open(img_path)
@@ -99,10 +87,10 @@ if net and db:
                             dict(
                                 source=img,
                                 xref="x", yref="y",
-                                x=0, y=height,
-                                sizex=width,
-                                sizey=height,
-                                sizing="stretch",
+                                x=dx_min, y=dy_max,
+                                sizex=(dx_max - dx_min),
+                                sizey=(dy_max - dy_min),
+                                sizing="stretch", # Stretches to fit the layout box
                                 opacity=1.0,
                                 layer="below"
                             )
@@ -112,25 +100,29 @@ if net and db:
                             s_node, e_node = db[start_point], db[destination]
                             try:
                                 path = nx.shortest_path(net, s_node, e_node, weight='weight')
-                                x_coords = [p[0] - x0 for p in path]
-                                y_coords = [p[1] - y0 for p in path]
-                                fig.add_trace(go.Scatter(x=x_coords, y=y_coords, mode='lines+markers', 
-                                                         line=dict(color='red', width=6), marker=dict(size=8, color='white')))
+                                x_coords = [p[0] for p in path]
+                                y_coords = [p[1] for p in path]
+                                fig.add_trace(go.Scatter(
+                                    x=x_coords, y=y_coords, mode='lines+markers', 
+                                    line=dict(color='red', width=6), marker=dict(size=8, color='white')
+                                ))
                             except: pass
 
-                        # THE LOCK: This is the most rigid way to stop the pancake
-                        fig.update_xaxes(range=[0, width], visible=False, fixedrange=True)
-                        fig.update_yaxes(range=[0, height], visible=False, 
-                                         scaleanchor="x", scaleratio=1, fixedrange=True)
+                        # THE PANCAKE KILLER: 
+                        # We removed the 'scaleanchor' and 'fixedrange' locks.
+                        # Now the map will expand to fill the 700px height naturally.
+                        fig.update_xaxes(range=[dx_min, dx_max], visible=False)
+                        fig.update_yaxes(range=[dy_min, dy_max], visible=False)
                         
                         fig.update_layout(
                             template="plotly_dark",
-                            height=plot_height, # Mandatory pixel height
+                            height=700, # A nice big view window
                             margin=dict(l=0, r=0, b=0, t=0),
                             dragmode='pan'
                         )
                         
-                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                        # The config that hid your buttons is GONE.
+                        st.plotly_chart(fig, use_container_width=True)
                         
                     except Exception as e:
                         st.error(f"Mapping Error: {e}")
