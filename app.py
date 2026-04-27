@@ -73,78 +73,68 @@ if net and db:
                     st.code(result, language="markdown")
                 
                 with map_col:
-                    st.markdown(f"### 🗺️ Calibrating: {view_floor}")
+                    st.markdown(f"### 🗺️ Network Topology: {view_floor}")
                     
                     try:
-                        selected_floor = floor_data[view_floor]
-                        img_path = selected_floor["img"]
-                        
-                        # 1. THE ZERO-BASE ORIGIN
-                        # We use your West and South coordinates as the (0,0) starting point
-                        origin_x = selected_floor["bounds"][0] # West
-                        origin_y = selected_floor["bounds"][2] # South
-                        
-                        # ==========================================
-                        # LIVE CALIBRATION INPUTS (Lag-Free)
-                        # ==========================================
-                        st.info("🛠️ **CALIBRATION:** Use the +/- buttons or type a number to fit the map.")
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            # Using number_input instead of slider to prevent continuous re-rendering
-                            img_width = st.number_input("↔️ Image Width", min_value=1000, max_value=50000, value=15000, step=250)
-                        with col2:
-                            img_height = st.number_input("↕️ Image Height", min_value=1000, max_value=50000, value=12000, step=250)
+                        # Get the bounds for the selected floor to filter the nodes
+                        x0, x1, y0, y1 = floor_data[view_floor]["bounds"]
                         
                         fig = go.Figure()
-                        img = Image.open(img_path)
-                        
-                        # 2. PLACE THE IMAGE
-                        fig.add_layout_image(
-                            dict(
-                                source=img,
-                                xref="x", yref="y",
-                                x=0, y=img_height, # Top-Left corner is now at (0, height)
-                                sizex=img_width,
-                                sizey=img_height,
-                                sizing="stretch",
-                                opacity=0.7, # Slightly transparent to see the math grid
-                                layer="below"
-                            )
-                        )
 
-                        # 3. DRAW THE ROUTE (Normalized to 0,0)
+                        # 1. GATHER ALL ROOMS ON THIS SPECIFIC FLOOR
+                        floor_nodes_x = []
+                        floor_nodes_y = []
+                        floor_node_names = []
+                        
+                        for name, pos in db.items():
+                            if x0 <= pos[0] <= x1 and y0 <= pos[1] <= y1:
+                                floor_nodes_x.append(pos[0])
+                                floor_nodes_y.append(pos[1])
+                                # Only show labels for important rooms to avoid clutter
+                                if any(keyword in name for keyword in ["STAIR", "ELEV", "LOBBY", "ROOM", "WARD"]):
+                                    floor_node_names.append(name)
+                                else:
+                                    floor_node_names.append("")
+
+                        # 2. DRAW THE DIGITAL BLUEPRINT
+                        fig.add_trace(go.Scatter(
+                            x=floor_nodes_x, y=floor_nodes_y,
+                            mode='markers+text',
+                            marker=dict(size=8, color='rgba(100, 150, 250, 0.4)'), # Soft blue nodes
+                            text=floor_node_names,
+                            textposition="bottom center",
+                            textfont=dict(size=9, color="gray"),
+                            hoverinfo="text",
+                            name="Locations"
+                        ))
+
+                        # 3. DRAW THE OPTIMAL ROUTE
                         if "SEQUENCE LIST" in result:
                             s_node, e_node = db[start_point], db[destination]
                             try:
                                 path = nx.shortest_path(net, s_node, e_node, weight='weight')
-                                
-                                # Subtract the origin so the math matches the image perfectly
-                                x_coords = [p[0] - origin_x for p in path]
-                                y_coords = [p[1] - origin_y for p in path]
+                                x_coords = [p[0] for p in path]
+                                y_coords = [p[1] for p in path]
                                 
                                 fig.add_trace(go.Scatter(
                                     x=x_coords, y=y_coords, mode='lines+markers', 
-                                    line=dict(color='red', width=6), marker=dict(size=8, color='white')
+                                    line=dict(color='red', width=5), 
+                                    marker=dict(size=10, color='white', line=dict(width=2, color='red')),
+                                    name="Optimal Path"
                                 ))
                                 
-                                # Start and End markers
+                                # Emphasize Start and End
                                 fig.add_trace(go.Scatter(
                                     x=[x_coords[0], x_coords[-1]], y=[y_coords[0], y_coords[-1]],
-                                    mode='markers+text', text=["START", "END"], textposition="top center",
-                                    marker=dict(size=14, color=['green', 'blue'])
+                                    mode='markers+text', text=["📍 START", "🏁 END"], 
+                                    textposition="top center",
+                                    textfont=dict(size=14, color="white"),
+                                    marker=dict(size=16, color=['green', 'blue'])
                                 ))
                             except nx.NetworkXNoPath:
                                 pass
 
-                        # 4. FORCE THE VIEWPORT
-                        # This adds 4 invisible dots at the corners of your image.
-                        # It FORCES Plotly to frame the image perfectly on your screen.
-                        fig.add_trace(go.Scatter(
-                            x=[0, img_width, img_width, 0], y=[0, 0, img_height, img_height],
-                            mode='markers', marker=dict(color='rgba(0,0,0,0)'), hoverinfo='skip'
-                        ))
-
-                        # LOCK THE PROPORTIONS (No Pancakes!)
+                        # 4. LOCK THE ASPECT RATIO (No Images = No Glitches)
                         fig.update_xaxes(visible=False)
                         fig.update_yaxes(visible=False, scaleanchor="x", scaleratio=1)
                         
@@ -159,6 +149,6 @@ if net and db:
                         st.plotly_chart(fig, use_container_width=True)
                         
                     except Exception as e:
-                        st.error(f"Mapping Error: {e}")
+                        st.error(f"Visualization Error: {e}")
 else:
     st.error("System Offline: Could not load the hospital map data.")
