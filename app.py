@@ -80,47 +80,48 @@ if net and db:
                     try:
                         selected_floor = floor_data[view_floor]
                         img_path = selected_floor["img"]
-                        dx_min, dx_max, dy_min, dy_max = selected_floor["bounds"]
+                        # xmin, xmax, ymin, ymax
+                        x0, x1, y0, y1 = selected_floor["bounds"]
                         
                         img = Image.open(img_path)
                         
-                        # Add the background architectural image
+                        # Calculate absolute dimensions
+                        width = x1 - x0
+                        height = y1 - y0
+                        
                         fig.add_layout_image(
                             dict(
                                 source=img,
                                 xref="x", yref="y",
-                                x=dx_min, y=dy_max,
-                                sizex=(dx_max - dx_min),
-                                sizey=(dy_max - dy_min),
+                                x=x0, 
+                                y=y1, # Top edge
+                                sizex=width,
+                                sizey=height, # Plotly handles the span automatically
                                 sizing="stretch",
                                 opacity=1.0,
                                 layer="below"
                             )
                         )
 
-                        # Draw the Route Line
+                        # Draw the Route
                         if "SEQUENCE LIST" in result:
-                            s_node = db[start_point]
-                            e_node = db[destination]
+                            s_node, e_node = db[start_point], db[destination]
                             try:
                                 path = nx.shortest_path(net, s_node, e_node, weight='weight')
                                 x_coords = [p[0] for p in path]
                                 y_coords = [p[1] for p in path]
                                 
-                                # High-visibility route line
                                 fig.add_trace(go.Scatter(
                                     x=x_coords, y=y_coords, 
                                     mode='lines+markers', 
                                     line=dict(color='red', width=6), 
-                                    marker=dict(size=8, color='white'),
-                                    name="Optimal Path"
+                                    marker=dict(size=8, color='white')
                                 ))
-                            except nx.NetworkXNoPath:
-                                st.error("No traversable path found for your role.")
+                            except: pass
 
-                        # LOCKING THE SCALE: Critical to prevent stretching
-                        fig.update_xaxes(range=[dx_min, dx_max], visible=False)
-                        fig.update_yaxes(range=[dy_min, dy_max], visible=False, scaleanchor="x", scaleratio=1)
+                        # THE CRITICAL FIX: Explicitly set the range and lock ratio
+                        fig.update_xaxes(range=[x0, x1], visible=False)
+                        fig.update_yaxes(range=[y0, y1], visible=False, scaleanchor="x", scaleratio=1)
                         
                         fig.update_layout(
                             template="plotly_dark", 
@@ -132,6 +133,6 @@ if net and db:
                         st.plotly_chart(fig, use_container_width=True)
                         
                     except FileNotFoundError:
-                        st.error(f"Image '{img_path}' not found. Please upload it to your GitHub.")
+                        st.error(f"Image '{img_path}' not found.")
 else:
     st.error("System Offline: Could not load the hospital map data.")
