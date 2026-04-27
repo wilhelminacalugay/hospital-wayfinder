@@ -67,51 +67,26 @@ if net and db:
                     st.code(result, language="markdown")
                 
                 with map_col:
-                    st.markdown("### Structural Spatial Map")
+                    st.markdown("### 🛠️ X-Ray Calibration Mode")
+                    st.warning("Hover over the furthest yellow dots to get your true coordinates.")
                     
-                    view_floor = st.selectbox("👁️ View Floor Map:", options=list(floor_data.keys()), index=1)
                     fig = go.Figure()
                     
-                    try:
-                        selected_floor = floor_data[view_floor]
-                        img_path = selected_floor["img"]
-                        bounds = selected_floor["bounds"]
-                        dx_min, dx_max, dy_min, dy_max = bounds[0], bounds[1], bounds[2], bounds[3]
-                        
-                        img = Image.open(img_path)
-                        
-                        fig.add_layout_image(
-                            dict(
-                                source=img,
-                                xref="x", yref="y",
-                                x=dx_min, y=dy_max,
-                                sizex=(dx_max - dx_min),
-                                sizey=(dy_max - dy_min),
-                                sizing="stretch", # Keep stretch, but we fix the axes below
-                                opacity=0.8,
-                                layer="below"
-                            )
-                        )
-                        
-                        # ==========================================
-                        # AUTOSCALE FIX: The Invisible Anchors
-                        # ==========================================
-                        # These 4 transparent dots sit at the extreme corners of your CAD bounds.
-                        # This forces the Autoscale button to frame the whole building, not just the route.
-                        fig.add_trace(go.Scatter(
-                            x=[dx_min, dx_max, dx_max, dx_min],
-                            y=[dy_min, dy_min, dy_max, dy_max],
-                            mode='markers',
-                            marker=dict(size=1, color='rgba(0,0,0,0)'), # 100% Transparent
-                            hoverinfo='skip',
-                            showlegend=False
-                        ))
-                        
-                    except FileNotFoundError:
-                        st.warning(f"Image '{img_path}' not found on server.")
-                        dx_min, dx_max, dy_min, dy_max = 0, 100, 0, 100 
+                    # 1. Plot every single room in the database
+                    all_x = [pos[0] for pos in db.values()]
+                    all_y = [pos[1] for pos in db.values()]
+                    room_names = list(db.keys())
+                    
+                    fig.add_trace(go.Scatter(
+                        x=all_x, y=all_y, 
+                        mode='markers', 
+                        marker=dict(size=8, color='yellow'), 
+                        text=room_names,          # Shows the room name
+                        hoverinfo='text+x+y',     # Shows the exact coordinates
+                        name="All Nodes"
+                    ))
 
-                    # Draw the Optimal Route Line
+                    # 2. Draw the Route so you know which cluster is your floor
                     if "SEQUENCE LIST" in result:
                         s_node = db[start_point]
                         e_node = db[destination]
@@ -119,21 +94,15 @@ if net and db:
                             path = nx.shortest_path(net, s_node, e_node, weight='weight')
                             x_coords = [p[0] for p in path]
                             y_coords = [p[1] for p in path]
-                            
-                            fig.add_trace(go.Scatter(x=x_coords, y=y_coords, mode='lines+markers', line=dict(color='red', width=5), name="Route"))
+                            fig.add_trace(go.Scatter(x=x_coords, y=y_coords, mode='lines', line=dict(color='red', width=3), name="Route"))
                         except nx.NetworkXNoPath:
                             pass
 
-                    # ==========================================
-                    # DISTORTION FIX: Axis Locking
-                    # ==========================================
-                    # scaleanchor and scaleratio force the image to maintain its true geometric shape
-                    fig.update_xaxes(range=[dx_min, dx_max], showgrid=False, zeroline=False, visible=False)
-                    fig.update_yaxes(range=[dy_min, dy_max], showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1)
+                    # 3. Turn the Axes ON so the math is not stretched
+                    fig.update_xaxes(showgrid=True, visible=True)
+                    fig.update_yaxes(showgrid=True, visible=True, scaleanchor="x", scaleratio=1)
                     
-                    # dragmode='pan' sets the default mouse behavior to moving around rather than drawing selection boxes
-                    fig.update_layout(template="plotly_dark", margin=dict(l=0, r=0, t=0, b=0), height=650, showlegend=False, dragmode='pan')
-                    
+                    fig.update_layout(template="plotly_dark", height=700, dragmode='pan')
                     st.plotly_chart(fig, use_container_width=True)
 else:
     st.error("System Offline: Could not load the hospital map data.")
