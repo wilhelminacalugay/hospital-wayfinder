@@ -83,19 +83,22 @@ if net and db:
                         fig = go.Figure()
                         img = Image.open(img_path)
                         
+                        # THE PAPER SPACE FIX:
+                        # We pin the image to the corners of the browser window (0 to 1) 
+                        # instead of pinning it to the 400,000 CAD coordinates.
                         fig.add_layout_image(
                             dict(
                                 source=img,
-                                xref="x", yref="y",
-                                x=dx_min, y=dy_max,
-                                sizex=(dx_max - dx_min),
-                                sizey=(dy_max - dy_min),
-                                sizing="stretch", # Stretches to fit the layout box
+                                xref="paper", yref="paper",
+                                x=0, y=1,         # Start at top-left of the screen
+                                sizex=1, sizey=1, # Fill 100% of the screen
+                                sizing="stretch",
                                 opacity=1.0,
                                 layer="below"
                             )
                         )
 
+                        # Draw the Route
                         if "SEQUENCE LIST" in result:
                             s_node, e_node = db[start_point], db[destination]
                             try:
@@ -108,20 +111,17 @@ if net and db:
                                 ))
                             except: pass
 
-                        # THE PANCAKE KILLER: 
-                        # We removed the 'scaleanchor' and 'fixedrange' locks.
-                        # Now the map will expand to fill the 700px height naturally.
+                        # We stretch the invisible math grid to perfectly match the image box
                         fig.update_xaxes(range=[dx_min, dx_max], visible=False)
                         fig.update_yaxes(range=[dy_min, dy_max], visible=False)
                         
                         fig.update_layout(
                             template="plotly_dark",
-                            height=700, # A nice big view window
+                            height=700, # A nice big 700px tall view window
                             margin=dict(l=0, r=0, b=0, t=0),
                             dragmode='pan'
                         )
                         
-                        # The config that hid your buttons is GONE.
                         st.plotly_chart(fig, use_container_width=True)
                         
                     except Exception as e:
