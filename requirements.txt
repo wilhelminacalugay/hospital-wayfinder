@@ -2,4 +2,5 @@ ezdxf
 networkx
 shapely
 streamlit
-matplotlib
+plotly
+Pillow
