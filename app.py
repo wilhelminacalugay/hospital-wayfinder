@@ -76,28 +76,40 @@ if net and db:
                     st.markdown(f"### 🗺️ Topological Network: {view_floor}")
                     
                     try:
-                        # Filter for the current floor's coordinates
                         x0, x1, y0, y1 = floor_data[view_floor]["bounds"]
+                        floor_width = x1 - x0
+                        floor_height = y1 - y0
+                        
+                        # ==========================================
+                        # THE NUCLEAR FIX: MIN-MAX SCALING (0 to 100)
+                        # ==========================================
+                        def scale_x(val): 
+                            return ((val - x0) / floor_width) * 100 if floor_width != 0 else 50
+                        
+                        def scale_y(val): 
+                            return ((val - y0) / floor_height) * 100 if floor_height != 0 else 50
+
                         fig = go.Figure()
 
-                        # 1. GATHER FLOOR NODES
+                        # 1. GATHER AND SCALE FLOOR NODES
                         floor_nodes_x, floor_nodes_y, floor_node_names = [], [], []
                         
                         for name, pos in db.items():
+                            # Only grab nodes that actually belong on this specific floor
                             if x0 <= pos[0] <= x1 and y0 <= pos[1] <= y1:
-                                floor_nodes_x.append(pos[0])
-                                floor_nodes_y.append(pos[1])
-                                # Only label major waypoints to keep the UI clean
-                                if any(kw in name for kw in ["STAIR", "ELEV", "LOBBY", "ROOM", "WARD", "PHARMACY", "EMERGENCY"]):
+                                floor_nodes_x.append(scale_x(pos[0]))
+                                floor_nodes_y.append(scale_y(pos[1]))
+                                
+                                if any(kw in name for kw in ["STAIR", "ELEV", "LOBBY", "ROOM", "WARD", "PHARMACY"]):
                                     floor_node_names.append(name)
                                 else:
                                     floor_node_names.append("")
 
-                        # 2. DRAW THE NODES (The "Subway Stations")
+                        # 2. DRAW THE SUBWAY NODES
                         fig.add_trace(go.Scatter(
                             x=floor_nodes_x, y=floor_nodes_y,
                             mode='markers+text',
-                            marker=dict(size=10, color='#3498db', line=dict(width=1, color='white')),
+                            marker=dict(size=12, color='#2c3e50', line=dict(width=1, color='#7f8c8d')),
                             text=floor_node_names,
                             textposition="bottom center",
                             textfont=dict(size=10, color="#bdc3c7"),
@@ -105,42 +117,44 @@ if net and db:
                             name="Locations"
                         ))
 
-                        # 3. DRAW THE OPTIMAL ROUTE
+                        # 3. DRAW AND SCALE THE OPTIMAL ROUTE
                         if "SEQUENCE LIST" in result:
                             s_node, e_node = db[start_point], db[destination]
                             try:
                                 path = nx.shortest_path(net, s_node, e_node, weight='weight')
-                                rx, ry = [p[0] for p in path], [p[1] for p in path]
                                 
-                                # The glowing red path
-                                fig.add_trace(go.Scatter(
-                                    x=rx, y=ry, mode='lines+markers', 
-                                    line=dict(color='#e74c3c', width=4), 
-                                    marker=dict(size=12, color='white', line=dict(width=2, color='#e74c3c')),
-                                    name="Optimal Path"
-                                ))
+                                # Filter the path to ONLY show the parts that are on THIS floor
+                                # (This prevents routes to other floors from breaking the layout!)
+                                path_on_floor = [p for p in path if x0 <= p[0] <= x1 and y0 <= p[1] <= y1]
                                 
-                                # Start and End Banners
-                                fig.add_trace(go.Scatter(
-                                    x=[rx[0], rx[-1]], y=[ry[0], ry[-1]],
-                                    mode='markers+text', text=["📍 START", "🏁 END"], 
-                                    textposition="top center",
-                                    textfont=dict(size=14, color="white"),
-                                    marker=dict(size=16, color=['#2ecc71', '#3498db'])
-                                ))
+                                if path_on_floor:
+                                    rx = [scale_x(p[0]) for p in path_on_floor]
+                                    ry = [scale_y(p[1]) for p in path_on_floor]
+                                    
+                                    fig.add_trace(go.Scatter(
+                                        x=rx, y=ry, mode='lines+markers', 
+                                        line=dict(color='#e74c3c', width=5), 
+                                        marker=dict(size=14, color='white', line=dict(width=2, color='#e74c3c')),
+                                        name="Optimal Path"
+                                    ))
+                                    
+                                    fig.add_trace(go.Scatter(
+                                        x=[rx[0], rx[-1]], y=[ry[0], ry[-1]],
+                                        mode='markers+text', text=["📍 START", "🏁 END"], 
+                                        textposition="top center",
+                                        textfont=dict(size=14, color="white"),
+                                        marker=dict(size=18, color=['#2ecc71', '#3498db'])
+                                    ))
                             except nx.NetworkXNoPath:
                                 pass
 
-                        # ==========================================
-                        # THE MAGIC FIX: REMOVING THE SCALE ANCHOR
-                        # ==========================================
-                        # Plotly will now auto-stretch the graph to fit the 650px container height perfectly.
-                        fig.update_xaxes(showgrid=False, zeroline=False, visible=False)
-                        fig.update_yaxes(showgrid=False, zeroline=False, visible=False) 
+                        # 4. LOCK THE GRID TO 0-100
+                        fig.update_xaxes(range=[0, 100], showgrid=False, zeroline=False, visible=False)
+                        fig.update_yaxes(range=[0, 100], showgrid=False, zeroline=False, visible=False) 
                         
                         fig.update_layout(
                             template="plotly_dark",
-                            height=650,
+                            height=700,
                             margin=dict(l=20, r=20, b=20, t=20),
                             dragmode='pan',
                             showlegend=False
