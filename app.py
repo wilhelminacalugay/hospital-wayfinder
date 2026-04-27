@@ -80,23 +80,21 @@ if net and db:
                     try:
                         selected_floor = floor_data[view_floor]
                         img_path = selected_floor["img"]
-                        # xmin, xmax, ymin, ymax
                         x0, x1, y0, y1 = selected_floor["bounds"]
                         
-                        # --- THE NORMALIZATION STEP ---
-                        # We subtract the starting point so the map starts at (0,0)
-                        # This stops the browser from collapsing the view
+                        # Normalize dimensions
                         width = x1 - x0
                         height = y1 - y0
                         
                         img = Image.open(img_path)
                         
+                        # THE NUCLEAR FIX: 
+                        # We force the image to be the exact "hero" of the plot
                         fig.add_layout_image(
                             dict(
                                 source=img,
                                 xref="x", yref="y",
-                                x=0,      # Start at zero
-                                y=height, # Top is the height
+                                x=0, y=height,
                                 sizex=width,
                                 sizey=height,
                                 sizing="stretch",
@@ -105,37 +103,34 @@ if net and db:
                             )
                         )
 
-                        # Draw the Route (Normalized)
                         if "SEQUENCE LIST" in result:
                             s_node, e_node = db[start_point], db[destination]
                             try:
                                 path = nx.shortest_path(net, s_node, e_node, weight='weight')
-                                # We subtract x0 and y0 from every point in the path!
                                 x_coords = [p[0] - x0 for p in path]
                                 y_coords = [p[1] - y0 for p in path]
-                                
-                                fig.add_trace(go.Scatter(
-                                    x=x_coords, y=y_coords, 
-                                    mode='lines+markers', 
-                                    line=dict(color='red', width=6), 
-                                    marker=dict(size=8, color='white')
-                                ))
+                                fig.add_trace(go.Scatter(x=x_coords, y=y_coords, mode='lines+markers', 
+                                                         line=dict(color='red', width=6), marker=dict(size=8, color='white')))
                             except: pass
 
-                        # Final Viewport (Zero-based)
-                        fig.update_xaxes(range=[0, width], visible=False)
-                        fig.update_yaxes(range=[0, height], visible=False, scaleanchor="x", scaleratio=1)
+                        # THE ASPECT RATIO ENFORCER
+                        # We explicitly tell Plotly to match the width of the container
+                        fig.update_xaxes(range=[0, width], showgrid=False, zeroline=False, visible=False)
+                        fig.update_yaxes(range=[0, height], showgrid=False, zeroline=False, visible=False,
+                                         scaleanchor="x", scaleratio=1) # THIS MUST BE 1
                         
                         fig.update_layout(
-                            template="plotly_dark", 
-                            height=700, 
-                            margin=dict(l=0, r=0, b=0, t=0),
+                            template="plotly_dark",
+                            height=800, # Increased height
+                            width=None, # Let it fill the column
+                            margin=dict(l=10, r=10, b=10, t=10),
+                            autosize=True,
                             dragmode='pan'
                         )
                         
                         st.plotly_chart(fig, use_container_width=True)
                         
-                    except FileNotFoundError:
-                        st.error(f"Image '{img_path}' not found.")
+                    except Exception as e:
+                        st.error(f"Error loading map: {e}")
 else:
     st.error("System Offline: Could not load the hospital map data.")
