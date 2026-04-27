@@ -84,7 +84,7 @@ if net and db:
                         
                         img = Image.open(img_path)
                         
-                        # Pin the high-res PNG to the exact CAD coordinates
+                        # Add the background image
                         fig.add_layout_image(
                             dict(
                                 source=img,
@@ -92,7 +92,8 @@ if net and db:
                                 x=dx_min, y=dy_max,
                                 sizex=(dx_max - dx_min),
                                 sizey=(dy_max - dy_min),
-                                sizing="stretch",
+                                # Change "stretch" to "fill" or "contain" to prevent squishing
+                                sizing="fill", 
                                 opacity=0.9,
                                 layer="below"
                             )
