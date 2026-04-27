@@ -82,18 +82,34 @@ if net and db:
                         img_path = selected_floor["img"]
                         dx_min, dx_max, dy_min, dy_max = selected_floor["bounds"]
                         
+                        # 1. Image Pixel Dimensions
+                        img_w = 3780
+                        img_h = 883
+                        img_ratio = img_w / img_h
+                        
+                        # 2. AutoCAD Math Dimensions
+                        cad_w = dx_max - dx_min
+                        cad_h = dy_max - dy_min
+                        
+                        # 3. Calculate True Height to Prevent Squishing
+                        # If we force the width to match the CAD width, how tall should the image REALLY be?
+                        true_image_height = cad_w / img_ratio
+                        
+                        # We center the taller image vertically over the skinny CAD bounding box
+                        y_center = dy_min + (cad_h / 2)
+                        y_adjusted_max = y_center + (true_image_height / 2)
+                        
                         img = Image.open(img_path)
                         
-                        # Add the background image
+                        # 4. Draw the image with its mathematically perfect dimensions
                         fig.add_layout_image(
                             dict(
                                 source=img,
                                 xref="x", yref="y",
-                                x=dx_min, y=dy_max,
-                                sizex=(dx_max - dx_min),
-                                sizey=(dy_max - dy_min),
-                                # Change "stretch" to "fill" or "contain" to prevent squishing
-                                sizing="fill", 
+                                x=dx_min, y=y_adjusted_max,
+                                sizex=cad_w,
+                                sizey=true_image_height,
+                                sizing="stretch", # "Stretch" is safe now because our math is perfect!
                                 opacity=0.9,
                                 layer="below"
                             )
@@ -118,7 +134,7 @@ if net and db:
                             except nx.NetworkXNoPath:
                                 pass
 
-                        # Lock the axes to prevent architectural distortion
+                        # Lock the axes to the original CAD bounds
                         fig.update_xaxes(range=[dx_min, dx_max], visible=False)
                         fig.update_yaxes(range=[dy_min, dy_max], visible=False, scaleanchor="x", scaleratio=1)
                         
