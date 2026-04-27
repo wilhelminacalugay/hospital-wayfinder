@@ -69,12 +69,9 @@ if net and db:
                 with map_col:
                     st.markdown("### Structural Spatial Map")
                     
-                    # Floor Selector for the Map View
                     view_floor = st.selectbox("👁️ View Floor Map:", options=list(floor_data.keys()), index=1)
-                    
                     fig = go.Figure()
                     
-                    # Load the background image and bounds based on dropdown
                     try:
                         selected_floor = floor_data[view_floor]
                         img_path = selected_floor["img"]
@@ -90,29 +87,35 @@ if net and db:
                                 x=dx_min, y=dy_max,
                                 sizex=(dx_max - dx_min),
                                 sizey=(dy_max - dy_min),
-                                sizing="stretch",
+                                sizing="stretch", # Keep stretch, but we fix the axes below
                                 opacity=0.8,
                                 layer="below"
                             )
                         )
+                        
+                        # ==========================================
+                        # AUTOSCALE FIX: The Invisible Anchors
+                        # ==========================================
+                        # These 4 transparent dots sit at the extreme corners of your CAD bounds.
+                        # This forces the Autoscale button to frame the whole building, not just the route.
+                        fig.add_trace(go.Scatter(
+                            x=[dx_min, dx_max, dx_max, dx_min],
+                            y=[dy_min, dy_min, dy_max, dy_max],
+                            mode='markers',
+                            marker=dict(size=1, color='rgba(0,0,0,0)'), # 100% Transparent
+                            hoverinfo='skip',
+                            showlegend=False
+                        ))
+                        
                     except FileNotFoundError:
                         st.warning(f"Image '{img_path}' not found on server.")
-                        dx_min, dx_max, dy_min, dy_max = 0, 100, 0, 100 # Fallback
-
-                    # ==========================================
-                    # CALIBRATION MODE: TEMPORARY 
-                    # (Delete this section once it looks right!)
-                    # ==========================================
-                    all_x = [pos[0] for pos in db.values()]
-                    all_y = [pos[1] for pos in db.values()]
-                    fig.add_trace(go.Scatter(x=all_x, y=all_y, mode='markers', marker=dict(size=4, color='yellow'), name="Calibration Nodes"))
+                        dx_min, dx_max, dy_min, dy_max = 0, 100, 0, 100 
 
                     # Draw the Optimal Route Line
                     if "SEQUENCE LIST" in result:
                         s_node = db[start_point]
                         e_node = db[destination]
                         try:
-                            # Reconstruct the path coordinates
                             path = nx.shortest_path(net, s_node, e_node, weight='weight')
                             x_coords = [p[0] for p in path]
                             y_coords = [p[1] for p in path]
@@ -121,9 +124,15 @@ if net and db:
                         except nx.NetworkXNoPath:
                             pass
 
+                    # ==========================================
+                    # DISTORTION FIX: Axis Locking
+                    # ==========================================
+                    # scaleanchor and scaleratio force the image to maintain its true geometric shape
                     fig.update_xaxes(range=[dx_min, dx_max], showgrid=False, zeroline=False, visible=False)
                     fig.update_yaxes(range=[dy_min, dy_max], showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1)
-                    fig.update_layout(template="plotly_dark", margin=dict(l=0, r=0, t=0, b=0), height=600, showlegend=False)
+                    
+                    # dragmode='pan' sets the default mouse behavior to moving around rather than drawing selection boxes
+                    fig.update_layout(template="plotly_dark", margin=dict(l=0, r=0, t=0, b=0), height=650, showlegend=False, dragmode='pan')
                     
                     st.plotly_chart(fig, use_container_width=True)
 else:
