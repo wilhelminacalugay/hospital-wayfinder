@@ -91,20 +91,16 @@ if net and db:
                         true_image_height = cad_w / img_ratio
                         
                         # ==========================================
-                        # MICRO-NUDGE OFFSETS (Adjust these if needed!)
+                        # MICRO-NUDGE OFFSETS 
                         # ==========================================
-                        # If route is too far LEFT, increase x_offset (e.g., 500)
-                        # If route is too far RIGHT, decrease x_offset (e.g., -500)
+                        # Make sure there are NO quotation marks around your numbers!
                         x_offset = 0 
+                        y_offset = -1200 
                         
-                        # If route is floating ABOVE the hallways, decrease y_offset (e.g., -500)
-                        # If route is floating BELOW the hallways, increase y_offset (e.g., 500)
-                        y_offset = -1,000 # Nudging the image down slightly based on your screenshot
-                        
-                        # Apply the offsets to the image placement
-                        y_center = dy_min + (cad_h / 2)
-                        y_adjusted_max = y_center + (true_image_height / 2) + y_offset
-                        x_adjusted_min = dx_min + x_offset
+                        # Apply the offsets (safely converting them to floats to prevent errors)
+                        y_center = dy_min + (cad_h / 2.0)
+                        y_adjusted_max = y_center + (true_image_height / 2.0) + float(y_offset)
+                        x_adjusted_min = dx_min + float(x_offset)
                         
                         img = Image.open(img_path)
                         
