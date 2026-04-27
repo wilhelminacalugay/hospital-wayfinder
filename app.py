@@ -79,71 +79,82 @@ if net and db:
                         selected_floor = floor_data[view_floor]
                         img_path = selected_floor["img"]
                         
-                        # We only use your West and North coordinates as the "Anchor Point"
-                        # This pins the top-left corner of the image in place.
-                        dx_min = selected_floor["bounds"][0] # West
-                        dy_max = selected_floor["bounds"][3] # North
+                        # 1. THE ZERO-BASE ORIGIN
+                        # We use your West and South coordinates as the (0,0) starting point
+                        origin_x = selected_floor["bounds"][0] # West
+                        origin_y = selected_floor["bounds"][2] # South
                         
                         # ==========================================
                         # LIVE CALIBRATION SLIDERS
                         # ==========================================
-                        st.info("🛠️ **CALIBRATION MODE:** Adjust these sliders until the hallways match the red route line.")
+                        st.info("🛠️ **CALIBRATION:** Adjust sliders until the map fits the red route.")
                         col1, col2 = st.columns(2)
                         with col1:
-                            # We start the width at 15,000 instead of your massive 114,000
+                            # Defaulting to 15,000 instead of 114,000!
                             img_width = st.slider("↔️ Image Width", min_value=1000, max_value=50000, value=15000, step=100)
                         with col2:
-                            # We start the height around your recorded 12,000
+                            # Defaulting to 12,000
                             img_height = st.slider("↕️ Image Height", min_value=1000, max_value=50000, value=12000, step=100)
                         
                         fig = go.Figure()
                         img = Image.open(img_path)
                         
-                        # Pin the image to the actual map grid (fixes panning!)
+                        # 2. PLACE THE IMAGE
                         fig.add_layout_image(
                             dict(
                                 source=img,
                                 xref="x", yref="y",
-                                x=dx_min, y=dy_max, # Pinned to Top-Left
+                                x=0, y=img_height, # Top-Left corner is now at (0, height)
                                 sizex=img_width,
                                 sizey=img_height,
                                 sizing="stretch",
-                                opacity=0.6, # Semi-transparent so you can see the red lines
+                                opacity=0.7, # Slightly transparent to see the math grid
                                 layer="below"
                             )
                         )
 
-                        # Draw the Route
+                        # 3. DRAW THE ROUTE (Normalized to 0,0)
                         if "SEQUENCE LIST" in result:
                             s_node, e_node = db[start_point], db[destination]
                             try:
                                 path = nx.shortest_path(net, s_node, e_node, weight='weight')
-                                x_coords = [p[0] for p in path]
-                                y_coords = [p[1] for p in path]
                                 
-                                # Draw a bright red line
+                                # Subtract the origin so the math matches the image perfectly
+                                x_coords = [p[0] - origin_x for p in path]
+                                y_coords = [p[1] - origin_y for p in path]
+                                
                                 fig.add_trace(go.Scatter(
                                     x=x_coords, y=y_coords, mode='lines+markers', 
                                     line=dict(color='red', width=6), marker=dict(size=8, color='white')
                                 ))
                                 
-                                # Also draw the Start and End points clearly
+                                # Start and End markers
                                 fig.add_trace(go.Scatter(
                                     x=[x_coords[0], x_coords[-1]], y=[y_coords[0], y_coords[-1]],
                                     mode='markers+text', text=["START", "END"], textposition="top center",
                                     marker=dict(size=14, color=['green', 'blue'])
                                 ))
-                            except: pass
+                            except nx.NetworkXNoPath:
+                                pass
 
-                        # THE PANCAKE KILLER: Forces real architectural proportions
+                        # 4. FORCE THE VIEWPORT
+                        # This adds 4 invisible dots at the corners of your image.
+                        # It FORCES Plotly to frame the image perfectly on your screen.
+                        fig.add_trace(go.Scatter(
+                            x=[0, img_width, img_width, 0], y=[0, 0, img_height, img_height],
+                            mode='markers', marker=dict(color='rgba(0,0,0,0)'), hoverinfo='skip'
+                        ))
+
+                        # LOCK THE PROPORTIONS (No Pancakes!)
                         fig.update_xaxes(visible=False)
                         fig.update_yaxes(visible=False, scaleanchor="x", scaleratio=1)
                         
                         fig.update_layout(
                             template="plotly_dark",
-                            height=600,
+                            height=700,
                             margin=dict(l=0, r=0, b=0, t=0),
-                            dragmode='pan'
+                            dragmode='pan',
+                            showlegend=False
                         )
                         
                         st.plotly_chart(fig, use_container_width=True)
