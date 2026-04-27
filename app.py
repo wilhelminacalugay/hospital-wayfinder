@@ -73,96 +73,65 @@ if net and db:
                     st.code(result, language="markdown")
                 
                 with map_col:
-                    st.markdown(f"### 🗺️ Topological Network: {view_floor}")
+                    st.markdown(f"### 🗺️ Structural Spatial Map: {view_floor}")
+                    
+                    fig = go.Figure()
                     
                     try:
-                        x0, x1, y0, y1 = floor_data[view_floor]["bounds"]
-                        floor_width = x1 - x0
-                        floor_height = y1 - y0
+                        selected_floor = floor_data[view_floor]
+                        img_path = selected_floor["img"]
+                        dx_min, dx_max, dy_min, dy_max = selected_floor["bounds"]
                         
-                        # ==========================================
-                        # THE NUCLEAR FIX: MIN-MAX SCALING (0 to 100)
-                        # ==========================================
-                        def scale_x(val): 
-                            return ((val - x0) / floor_width) * 100 if floor_width != 0 else 50
+                        img = Image.open(img_path)
                         
-                        def scale_y(val): 
-                            return ((val - y0) / floor_height) * 100 if floor_height != 0 else 50
+                        # Pin the high-res PNG to the exact CAD coordinates
+                        fig.add_layout_image(
+                            dict(
+                                source=img,
+                                xref="x", yref="y",
+                                x=dx_min, y=dy_max,
+                                sizex=(dx_max - dx_min),
+                                sizey=(dy_max - dy_min),
+                                sizing="stretch",
+                                opacity=0.9,
+                                layer="below"
+                            )
+                        )
 
-                        fig = go.Figure()
-
-                        # 1. GATHER AND SCALE FLOOR NODES
-                        floor_nodes_x, floor_nodes_y, floor_node_names = [], [], []
-                        
-                        for name, pos in db.items():
-                            # Only grab nodes that actually belong on this specific floor
-                            if x0 <= pos[0] <= x1 and y0 <= pos[1] <= y1:
-                                floor_nodes_x.append(scale_x(pos[0]))
-                                floor_nodes_y.append(scale_y(pos[1]))
-                                
-                                if any(kw in name for kw in ["STAIR", "ELEV", "LOBBY", "ROOM", "WARD", "PHARMACY"]):
-                                    floor_node_names.append(name)
-                                else:
-                                    floor_node_names.append("")
-
-                        # 2. DRAW THE SUBWAY NODES
-                        fig.add_trace(go.Scatter(
-                            x=floor_nodes_x, y=floor_nodes_y,
-                            mode='markers+text',
-                            marker=dict(size=12, color='#2c3e50', line=dict(width=1, color='#7f8c8d')),
-                            text=floor_node_names,
-                            textposition="bottom center",
-                            textfont=dict(size=10, color="#bdc3c7"),
-                            hoverinfo="text",
-                            name="Locations"
-                        ))
-
-                        # 3. DRAW AND SCALE THE OPTIMAL ROUTE
+                        # Draw the Route
                         if "SEQUENCE LIST" in result:
-                            s_node, e_node = db[start_point], db[destination]
+                            s_node = db[start_point]
+                            e_node = db[destination]
                             try:
                                 path = nx.shortest_path(net, s_node, e_node, weight='weight')
+                                x_coords = [p[0] for p in path]
+                                y_coords = [p[1] for p in path]
                                 
-                                # Filter the path to ONLY show the parts that are on THIS floor
-                                # (This prevents routes to other floors from breaking the layout!)
-                                path_on_floor = [p for p in path if x0 <= p[0] <= x1 and y0 <= p[1] <= y1]
-                                
-                                if path_on_floor:
-                                    rx = [scale_x(p[0]) for p in path_on_floor]
-                                    ry = [scale_y(p[1]) for p in path_on_floor]
-                                    
-                                    fig.add_trace(go.Scatter(
-                                        x=rx, y=ry, mode='lines+markers', 
-                                        line=dict(color='#e74c3c', width=5), 
-                                        marker=dict(size=14, color='white', line=dict(width=2, color='#e74c3c')),
-                                        name="Optimal Path"
-                                    ))
-                                    
-                                    fig.add_trace(go.Scatter(
-                                        x=[rx[0], rx[-1]], y=[ry[0], ry[-1]],
-                                        mode='markers+text', text=["📍 START", "🏁 END"], 
-                                        textposition="top center",
-                                        textfont=dict(size=14, color="white"),
-                                        marker=dict(size=18, color=['#2ecc71', '#3498db'])
-                                    ))
+                                fig.add_trace(go.Scatter(
+                                    x=x_coords, y=y_coords, 
+                                    mode='lines+markers', 
+                                    line=dict(color='red', width=6), 
+                                    marker=dict(size=8, color='white'),
+                                    name="Optimal Path"
+                                ))
                             except nx.NetworkXNoPath:
                                 pass
 
-                        # 4. LOCK THE GRID TO 0-100
-                        fig.update_xaxes(range=[0, 100], showgrid=False, zeroline=False, visible=False)
-                        fig.update_yaxes(range=[0, 100], showgrid=False, zeroline=False, visible=False) 
+                        # Lock the axes to prevent architectural distortion
+                        fig.update_xaxes(range=[dx_min, dx_max], visible=False)
+                        fig.update_yaxes(range=[dy_min, dy_max], visible=False, scaleanchor="x", scaleratio=1)
                         
                         fig.update_layout(
-                            template="plotly_dark",
-                            height=700,
-                            margin=dict(l=20, r=20, b=20, t=20),
+                            template="plotly_dark", 
+                            height=700, 
+                            margin=dict(l=0, r=0, b=0, t=0),
                             dragmode='pan',
                             showlegend=False
                         )
                         
                         st.plotly_chart(fig, use_container_width=True)
                         
-                    except Exception as e:
-                        st.error(f"Visualization Error: {e}")
+                    except FileNotFoundError:
+                        st.error(f"Image '{img_path}' not found on server.")
 else:
     st.error("System Offline: Could not load the hospital map data.")
