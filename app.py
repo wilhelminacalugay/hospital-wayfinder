@@ -85,16 +85,15 @@ if net and db:
                         origin_y = selected_floor["bounds"][2] # South
                         
                         # ==========================================
-                        # LIVE CALIBRATION SLIDERS
+                        # LIVE CALIBRATION INPUTS (Lag-Free)
                         # ==========================================
-                        st.info("🛠️ **CALIBRATION:** Adjust sliders until the map fits the red route.")
+                        st.info("🛠️ **CALIBRATION:** Use the +/- buttons or type a number to fit the map.")
                         col1, col2 = st.columns(2)
                         with col1:
-                            # Defaulting to 15,000 instead of 114,000!
-                            img_width = st.slider("↔️ Image Width", min_value=1000, max_value=50000, value=15000, step=100)
+                            # Using number_input instead of slider to prevent continuous re-rendering
+                            img_width = st.number_input("↔️ Image Width", min_value=1000, max_value=50000, value=15000, step=250)
                         with col2:
-                            # Defaulting to 12,000
-                            img_height = st.slider("↕️ Image Height", min_value=1000, max_value=50000, value=12000, step=100)
+                            img_height = st.number_input("↕️ Image Height", min_value=1000, max_value=50000, value=12000, step=250)
                         
                         fig = go.Figure()
                         img = Image.open(img_path)
