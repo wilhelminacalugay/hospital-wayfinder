@@ -83,33 +83,36 @@ if net and db:
                         # xmin, xmax, ymin, ymax
                         x0, x1, y0, y1 = selected_floor["bounds"]
                         
-                        img = Image.open(img_path)
-                        
-                        # Calculate absolute dimensions
+                        # --- THE NORMALIZATION STEP ---
+                        # We subtract the starting point so the map starts at (0,0)
+                        # This stops the browser from collapsing the view
                         width = x1 - x0
                         height = y1 - y0
+                        
+                        img = Image.open(img_path)
                         
                         fig.add_layout_image(
                             dict(
                                 source=img,
                                 xref="x", yref="y",
-                                x=x0, 
-                                y=y1, # Top edge
+                                x=0,      # Start at zero
+                                y=height, # Top is the height
                                 sizex=width,
-                                sizey=height, # Plotly handles the span automatically
+                                sizey=height,
                                 sizing="stretch",
                                 opacity=1.0,
                                 layer="below"
                             )
                         )
 
-                        # Draw the Route
+                        # Draw the Route (Normalized)
                         if "SEQUENCE LIST" in result:
                             s_node, e_node = db[start_point], db[destination]
                             try:
                                 path = nx.shortest_path(net, s_node, e_node, weight='weight')
-                                x_coords = [p[0] for p in path]
-                                y_coords = [p[1] for p in path]
+                                # We subtract x0 and y0 from every point in the path!
+                                x_coords = [p[0] - x0 for p in path]
+                                y_coords = [p[1] - y0 for p in path]
                                 
                                 fig.add_trace(go.Scatter(
                                     x=x_coords, y=y_coords, 
@@ -119,9 +122,9 @@ if net and db:
                                 ))
                             except: pass
 
-                        # THE CRITICAL FIX: Explicitly set the range and lock ratio
-                        fig.update_xaxes(range=[x0, x1], visible=False)
-                        fig.update_yaxes(range=[y0, y1], visible=False, scaleanchor="x", scaleratio=1)
+                        # Final Viewport (Zero-based)
+                        fig.update_xaxes(range=[0, width], visible=False)
+                        fig.update_yaxes(range=[0, height], visible=False, scaleanchor="x", scaleratio=1)
                         
                         fig.update_layout(
                             template="plotly_dark", 
