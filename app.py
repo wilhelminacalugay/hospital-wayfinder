@@ -82,40 +82,46 @@ if net and db:
                         img_path = selected_floor["img"]
                         dx_min, dx_max, dy_min, dy_max = selected_floor["bounds"]
                         
-                        # 1. Image Pixel Dimensions
                         img_w = 3780
                         img_h = 883
                         img_ratio = img_w / img_h
                         
-                        # 2. AutoCAD Math Dimensions
                         cad_w = dx_max - dx_min
                         cad_h = dy_max - dy_min
-                        
-                        # 3. Calculate True Height to Prevent Squishing
-                        # If we force the width to match the CAD width, how tall should the image REALLY be?
                         true_image_height = cad_w / img_ratio
                         
-                        # We center the taller image vertically over the skinny CAD bounding box
+                        # ==========================================
+                        # MICRO-NUDGE OFFSETS (Adjust these if needed!)
+                        # ==========================================
+                        # If route is too far LEFT, increase x_offset (e.g., 500)
+                        # If route is too far RIGHT, decrease x_offset (e.g., -500)
+                        x_offset = 0 
+                        
+                        # If route is floating ABOVE the hallways, decrease y_offset (e.g., -500)
+                        # If route is floating BELOW the hallways, increase y_offset (e.g., 500)
+                        y_offset = -800 # Nudging the image down slightly based on your screenshot
+                        
+                        # Apply the offsets to the image placement
                         y_center = dy_min + (cad_h / 2)
-                        y_adjusted_max = y_center + (true_image_height / 2)
+                        y_adjusted_max = y_center + (true_image_height / 2) + y_offset
+                        x_adjusted_min = dx_min + x_offset
                         
                         img = Image.open(img_path)
                         
-                        # 4. Draw the image with its mathematically perfect dimensions
                         fig.add_layout_image(
                             dict(
                                 source=img,
                                 xref="x", yref="y",
-                                x=dx_min, y=y_adjusted_max,
+                                x=x_adjusted_min, y=y_adjusted_max,
                                 sizex=cad_w,
                                 sizey=true_image_height,
-                                sizing="stretch", # "Stretch" is safe now because our math is perfect!
+                                sizing="stretch", 
                                 opacity=0.9,
                                 layer="below"
                             )
                         )
 
-                        # Draw the Route
+                        # Draw the Route and Markers
                         if "SEQUENCE LIST" in result:
                             s_node = db[start_point]
                             e_node = db[destination]
@@ -124,17 +130,29 @@ if net and db:
                                 x_coords = [p[0] for p in path]
                                 y_coords = [p[1] for p in path]
                                 
+                                # 1. The Route Line
                                 fig.add_trace(go.Scatter(
                                     x=x_coords, y=y_coords, 
                                     mode='lines+markers', 
                                     line=dict(color='red', width=6), 
                                     marker=dict(size=8, color='white'),
-                                    name="Optimal Path"
+                                    name="Optimal Path",
+                                    hoverinfo='skip'
+                                ))
+                                
+                                # 2. Start and End Points
+                                fig.add_trace(go.Scatter(
+                                    x=[x_coords[0], x_coords[-1]], y=[y_coords[0], y_coords[-1]],
+                                    mode='markers+text', 
+                                    text=["📍 START", "🏁 END"], 
+                                    textposition="top center",
+                                    textfont=dict(size=16, color="white", family="Arial Black"),
+                                    marker=dict(size=20, color=['#00cc66', '#3399ff'], line=dict(width=3, color='white')),
+                                    name="Waypoints"
                                 ))
                             except nx.NetworkXNoPath:
                                 pass
 
-                        # Lock the axes to the original CAD bounds
                         fig.update_xaxes(range=[dx_min, dx_max], visible=False)
                         fig.update_yaxes(range=[dy_min, dy_max], visible=False, scaleanchor="x", scaleratio=1)
                         
