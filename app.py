@@ -91,7 +91,7 @@ if net and db:
                         
                         img = Image.open(img_path)
                         
-                        # 1. Image Pixel Dimensions (Based on your high-res export)
+                        # 1. Image Pixel Dimensions
                         img_w = img.width
                         img_h = img.height
                         img_ratio = img_w / img_h
@@ -100,19 +100,30 @@ if net and db:
                         cad_w = dx_max - dx_min
                         cad_h = dy_max - dy_min
                         
-                        # 3. Calculate True Height to Prevent Squishing
+                        # 3. True Height Calculation
                         true_image_height = cad_w / img_ratio
                         
-                        # Center the un-squished image vertically over the math box
-                        y_center = dy_min + (cad_h / 2)
-                        y_adjusted_max = y_center + (true_image_height / 2)
+                        # ==========================================
+                        # MICRO-NUDGE OFFSETS FOR ALIGNMENT
+                        # ==========================================
+                        # Adjust these numbers to slide the image under the route!
+                        # Positive x_offset moves image RIGHT, Negative moves LEFT
+                        # Positive y_offset moves image UP, Negative moves DOWN
                         
-                        # Add the background image
+                        x_offset = -3000   # Sliding image left slightly
+                        y_offset = -1500   # Sliding image down slightly
+                        
+                        # Apply the offsets
+                        y_center = dy_min + (cad_h / 2)
+                        y_adjusted_max = y_center + (true_image_height / 2) + float(y_offset)
+                        x_adjusted_min = dx_min + float(x_offset)
+                        
+                        # 4. Draw the perfectly proportioned, shifted image
                         fig.add_layout_image(
                             dict(
                                 source=img,
                                 xref="x", yref="y",
-                                x=dx_min, y=y_adjusted_max,
+                                x=x_adjusted_min, y=y_adjusted_max,
                                 sizex=cad_w,
                                 sizey=true_image_height,
                                 sizing="stretch", 
@@ -177,9 +188,6 @@ if net and db:
                             showlegend=False
                         )
                         st.plotly_chart(fig, use_container_width=True)
-                        
-                    except Exception as e:
-                        st.error(f"Mapping Error: {e}")
                         
                     except Exception as e:
                         st.error(f"Mapping Error: {e}")
