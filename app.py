@@ -194,9 +194,9 @@ if net and db:
                                     if path[0][0] == floor_path_x[0] and path[0][1] == floor_path_y[0]:
                                         fig.add_trace(go.Scatter(
                                             x=[floor_path_x[0]], y=[floor_path_y[0]],
-                                            mode='markers+text', text=["📍 START"], textposition="top center",
-                                            textfont=dict(size=16, color="white", family="Arial Black"),
-                                            marker=dict(size=20, color='#00cc66', line=dict(width=3, color='white')),
+                                            mode='markers+text', text=["START"], textposition="top center",
+                                            textfont=dict(size=16, color="yellow", family="Arial Black"),
+                                            marker=dict(size=20, color='#00cc66', line=dict(width=3, color='yellow')),
                                             name="Start"
                                         ))
                                         
@@ -204,9 +204,9 @@ if net and db:
                                     if path[-1][0] == floor_path_x[-1] and path[-1][1] == floor_path_y[-1]:
                                         fig.add_trace(go.Scatter(
                                             x=[floor_path_x[-1]], y=[floor_path_y[-1]],
-                                            mode='markers+text', text=["🏁 END"], textposition="top center",
-                                            textfont=dict(size=16, color="white", family="Arial Black"),
-                                            marker=dict(size=20, color='#3399ff', line=dict(width=3, color='white')),
+                                            mode='markers+text', text=["END"], textposition="top center",
+                                            textfont=dict(size=16, color="yellow", family="Arial Black"),
+                                            marker=dict(size=20, color='#3399ff', line=dict(width=3, color='yellow')),
                                             name="End"
                                         ))
 
