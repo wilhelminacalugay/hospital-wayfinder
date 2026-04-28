@@ -95,8 +95,8 @@ if net and db:
                         # ==========================================
                         # Bypassing the server error by hardcoding the exact export size.
                         # Put your actual PNG pixel dimensions right here:
-                        img_pixel_width = 1920   # <--- Change this to your PNG width!
-                        img_pixel_height = 1080  # <--- Change this to your PNG height!
+                        img_pixel_width = 5120   # <--- Change this to your PNG width!
+                        img_pixel_height = 2880  # <--- Change this to your PNG height!
                         
                         img_ratio = img_pixel_width / img_pixel_height
                         
