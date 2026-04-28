@@ -111,7 +111,7 @@ if net and db:
                         # Positive y_offset moves image UP, Negative moves DOWN
                         
                         x_offset = -3000   # Sliding image left slightly
-                        y_offset = -1600   # Sliding image down slightly
+                        y_offset = -2000   # Sliding image down slightly
                         
                         # Apply the offsets
                         y_center = dy_min + (cad_h / 2)
