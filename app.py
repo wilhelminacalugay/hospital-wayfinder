@@ -23,19 +23,6 @@ with st.spinner("Loading structural network geometry..."):
     net, db = load_hospital_data()
 
 # ==========================================
-# SURGICAL NODE CORRECTIONS
-# ==========================================
-# Fixes specific rooms that were drawn slightly off-center in AutoCAD.
-if db:
-    node_corrections = {
-        # Adjust these numbers until the node lands perfectly in the room!
-        "PWD BATHROOM UG": (db["PWD BATHROOM UG"][0] + 500, db["PWD BATHROOM UG"][1] - 2000),
-    }
-    for room_name, new_coords in node_corrections.items():
-        if room_name in db:
-            db[room_name] = new_coords
-
-# ==========================================
 # MULTI-FLOOR IMAGE DICTIONARY & BOUNDS
 # ==========================================
 MASTER_WEST = 417942.2
