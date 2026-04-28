@@ -31,14 +31,17 @@ MASTER_SOUTH = -157112.6
 MASTER_NORTH = -145093.6
 MASTER_BOUNDS = [MASTER_WEST, MASTER_EAST, MASTER_SOUTH, MASTER_NORTH]
 
+# ==========================================
+# MULTI-FLOOR IMAGE DICTIONARY & BOUNDS
+# ==========================================
 floor_data = {
-    "Lower Ground (LG)": {"img": "new block-LG_EXPORT.png", "bounds": MASTER_BOUNDS},
-    "Upper Ground (UG)": {"img": "new block-UG_EXPORT.png", "bounds": MASTER_BOUNDS},
-    "2nd Floor (2F)": {"img": "new block-2F_EXPORT.png", "bounds": MASTER_BOUNDS},
-    "3rd Floor (3F)": {"img": "new block-3F_EXPORT.png", "bounds": MASTER_BOUNDS},
-    "4th Floor (4F)": {"img": "new block-4F_EXPORT.png", "bounds": MASTER_BOUNDS},
-    "5th Floor (5F)": {"img": "new block-5F_EXPORT.png", "bounds": MASTER_BOUNDS},
-    "6th Floor (6F)": {"img": "new block-6F_EXPORT.png", "bounds": MASTER_BOUNDS}
+    "Lower Ground (LG)": {"img": "new block-LG_EXPORT.png", "bounds": MASTER_BOUNDS, "tag": "LG"},
+    "Upper Ground (UG)": {"img": "new block-UG_EXPORT.png", "bounds": MASTER_BOUNDS, "tag": "UG"},
+    "2nd Floor (2F)": {"img": "new block-2F_EXPORT.png", "bounds": MASTER_BOUNDS, "tag": "2F"},
+    "3rd Floor (3F)": {"img": "new block-3F_EXPORT.png", "bounds": MASTER_BOUNDS, "tag": "3F"},
+    "4th Floor (4F)": {"img": "new block-4F_EXPORT.png", "bounds": MASTER_BOUNDS, "tag": "4F"},
+    "5th Floor (5F)": {"img": "new block-5F_EXPORT.png", "bounds": MASTER_BOUNDS, "tag": "5F"},
+    "6th Floor (6F)": {"img": "new block-6F_EXPORT.png", "bounds": MASTER_BOUNDS, "tag": "6F"}
 }
 
 # ==========================================
@@ -151,7 +154,7 @@ if net and db:
                                 floor_path_y = []
                                 
                                 for p in path:
-                                    if (dx_min - 500) <= p[0] <= (dx_max + 500) and (dy_min - 500) <= p[1] <= (dy_max + 500):
+                                    if current_tag in string_name_of_node: 
                                         floor_path_x.append(p[0])
                                         floor_path_y.append(p[1])
                                 
