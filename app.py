@@ -27,14 +27,21 @@ with st.spinner("Loading structural network geometry..."):
 # THE CALIBRATED MULTI-FLOOR DICTIONARY
 # ==========================================
 # These are the precise bounds you extracted via X-Ray mode
+# The Master Bounding Box from AutoCAD (applies to ALL floors)
+MASTER_WEST = 417942.2
+MASTER_EAST = 532554.5
+MASTER_SOUTH = -157112.6
+MASTER_NORTH = -145093.6
+MASTER_BOUNDS = [MASTER_WEST, MASTER_EAST, MASTER_SOUTH, MASTER_NORTH]
+
 floor_data = {
-    "Lower Ground (LG)": {"img": "lg_floor.png", "bounds": [425133.6, 531137.5, -170844.5, -159463.5]},
-    "Upper Ground (UG)": {"img": "ug_floor.png", "bounds": [417942.2, 532554.5, -157112.6, -145093.6]},
-    "2nd Floor (2F)": {"img": "2f_floor.png", "bounds": [426516.0, 532060.5, -141688.0, -128588.0]},
-    "3rd Floor (3F)": {"img": "typ_3f_4f.png", "bounds": [426663.1, 538285.5, -123451.5, -112552.8]},
-    "4th Floor (4F)": {"img": "typ_3f_4f.png", "bounds": [425044.6, 530667.0, -109543.5, -98644.7]},
-    "5th Floor (5F)": {"img": "5f_floor.png", "bounds": [424336.0, 528224.6, -96369.2, -84121.1]},
-    "6th Floor (6F)": {"img": "6f_floor.png", "bounds": [469338.6, 483617.2, -80271.7, -76308.3]}
+    "Lower Ground (LG)": {"img": "new block-LG_EXPORT.png", "bounds": MASTER_BOUNDS},
+    "Upper Ground (UG)": {"img": "new block-UG_EXPORT.png", "bounds": MASTER_BOUNDS},
+    "2nd Floor (2F)": {"img": "new block-2F_EXPORT.png", "bounds": MASTER_BOUNDS},
+    "3rd Floor (3F)": {"img": "new block-3F_EXPORT.png", "bounds": MASTER_BOUNDS},
+    "4th Floor (4F)": {"img": "new block-4F_EXPORT.png", "bounds": MASTER_BOUNDS},
+    "5th Floor (5F)": {"img": "new block-5F_EXPORT.png", "bounds": MASTER_BOUNDS},
+    "6th Floor (6F)": {"img": "new block-6F_EXPORT.png", "bounds": MASTER_BOUNDS}
 }
 
 # ==========================================
@@ -82,70 +89,65 @@ if net and db:
                         img_path = selected_floor["img"]
                         dx_min, dx_max, dy_min, dy_max = selected_floor["bounds"]
                         
-                        img_w = 3780
-                        img_h = 883
-                        img_ratio = img_w / img_h
-                        
-                        cad_w = dx_max - dx_min
-                        cad_h = dy_max - dy_min
-                        true_image_height = cad_w / img_ratio
-                        
-                        # ==========================================
-                        # MICRO-NUDGE OFFSETS 
-                        # ==========================================
-                        # Make sure there are NO quotation marks around your numbers!
-                        x_offset = 0 
-                        y_offset = -1200 
-                        
-                        # Apply the offsets (safely converting them to floats to prevent errors)
-                        y_center = dy_min + (cad_h / 2.0)
-                        y_adjusted_max = y_center + (true_image_height / 2.0) + float(y_offset)
-                        x_adjusted_min = dx_min + float(x_offset)
-                        
                         img = Image.open(img_path)
                         
+                        # Add the background image (No nudging required!)
                         fig.add_layout_image(
                             dict(
                                 source=img,
                                 xref="x", yref="y",
-                                x=x_adjusted_min, y=y_adjusted_max,
-                                sizex=cad_w,
-                                sizey=true_image_height,
+                                x=dx_min, y=dy_max,
+                                sizex=(dx_max - dx_min),
+                                sizey=(dy_max - dy_min),
                                 sizing="stretch", 
                                 opacity=0.9,
                                 layer="below"
                             )
                         )
 
-                        # Draw the Route and Markers
                         if "SEQUENCE LIST" in result:
                             s_node = db[start_point]
                             e_node = db[destination]
                             try:
                                 path = nx.shortest_path(net, s_node, e_node, weight='weight')
-                                x_coords = [p[0] for p in path]
-                                y_coords = [p[1] for p in path]
                                 
-                                # 1. The Route Line
-                                fig.add_trace(go.Scatter(
-                                    x=x_coords, y=y_coords, 
-                                    mode='lines+markers', 
-                                    line=dict(color='red', width=6), 
-                                    marker=dict(size=8, color='white'),
-                                    name="Optimal Path",
-                                    hoverinfo='skip'
-                                ))
+                                # MULTI-FLOOR FILTER
+                                floor_path_x = []
+                                floor_path_y = []
                                 
-                                # 2. Start and End Points
-                                fig.add_trace(go.Scatter(
-                                    x=[x_coords[0], x_coords[-1]], y=[y_coords[0], y_coords[-1]],
-                                    mode='markers+text', 
-                                    text=["📍 START", "🏁 END"], 
-                                    textposition="top center",
-                                    textfont=dict(size=16, color="white", family="Arial Black"),
-                                    marker=dict(size=20, color=['#00cc66', '#3399ff'], line=dict(width=3, color='white')),
-                                    name="Waypoints"
-                                ))
+                                # Only plot nodes that are actually on this floor's CAD space
+                                for p in path:
+                                    if (dx_min - 500) <= p[0] <= (dx_max + 500) and (dy_min - 500) <= p[1] <= (dy_max + 500):
+                                        floor_path_x.append(p[0])
+                                        floor_path_y.append(p[1])
+                                
+                                if len(floor_path_x) > 0:
+                                    fig.add_trace(go.Scatter(
+                                        x=floor_path_x, y=floor_path_y, 
+                                        mode='lines+markers', 
+                                        line=dict(color='red', width=6), 
+                                        marker=dict(size=8, color='white'),
+                                        hoverinfo='skip'
+                                    ))
+                                    
+                                    # Start Marker
+                                    if path[0][0] == floor_path_x[0] and path[0][1] == floor_path_y[0]:
+                                        fig.add_trace(go.Scatter(
+                                            x=[floor_path_x[0]], y=[floor_path_y[0]],
+                                            mode='markers+text', text=["📍 START"], textposition="top center",
+                                            textfont=dict(size=16, color="white"),
+                                            marker=dict(size=20, color='#00cc66', line=dict(width=3, color='white'))
+                                        ))
+                                        
+                                    # End Marker
+                                    if path[-1][0] == floor_path_x[-1] and path[-1][1] == floor_path_y[-1]:
+                                        fig.add_trace(go.Scatter(
+                                            x=[floor_path_x[-1]], y=[floor_path_y[-1]],
+                                            mode='markers+text', text=["🏁 END"], textposition="top center",
+                                            textfont=dict(size=16, color="white"),
+                                            marker=dict(size=20, color='#3399ff', line=dict(width=3, color='white'))
+                                        ))
+
                             except nx.NetworkXNoPath:
                                 pass
 
@@ -155,14 +157,13 @@ if net and db:
                         fig.update_layout(
                             template="plotly_dark", 
                             height=700, 
-                            margin=dict(l=0, r=0, b=0, t=0),
-                            dragmode='pan',
+                            margin=dict(l=0, r=0, b=0, t=0), 
+                            dragmode='pan', 
                             showlegend=False
                         )
-                        
                         st.plotly_chart(fig, use_container_width=True)
                         
-                    except FileNotFoundError:
-                        st.error(f"Image '{img_path}' not found on server.")
+                    except Exception as e:
+                        st.error(f"Mapping Error: {e}")
 else:
     st.error("System Offline: Could not load the hospital map data.")
