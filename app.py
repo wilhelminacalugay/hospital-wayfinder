@@ -16,11 +16,11 @@ st.markdown("### Interactive Decision-Support Dashboard")
 # CACHE THE ALGORITHM & LOAD DATA
 # ==========================================
 @st.cache_resource
-def load_hospital_data():
+def load_hospital_data_v2():  # <--- We added _v2 here
     return build_hospital_graph("new block.dxf")
 
 with st.spinner("Loading structural network geometry..."):
-    net, db = load_hospital_data()
+    net, db = load_hospital_data_v2()  # <--- We added _v2 here
 
 # ==========================================
 # MULTI-FLOOR IMAGE DICTIONARY & BOUNDS
