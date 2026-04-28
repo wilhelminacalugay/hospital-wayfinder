@@ -136,6 +136,27 @@ if net and db:
                                         floor_path_y.append(p[1])
                                 
                                 if len(floor_path_x) > 0:
+                                    # --- VISUAL NODE CORRECTIONS ---
+                                    # We only shift the marker visually, protecting the backend math!
+                                    
+                                    # Check if the END point needs a visual nudge
+                                    end_x_nudge = 0
+                                    end_y_nudge = 0
+                                    
+                                    if destination == "PWD BATHROOM UG":
+                                        end_x_nudge = 500
+                                        end_y_nudge = -2000
+                                    elif destination == "PHARMACY UG": # Example from your new screenshot
+                                        end_x_nudge = 1000 # Nudge right
+                                        end_y_nudge = 500  # Nudge up
+                                        
+                                    # Apply the nudge to the final coordinate in the array
+                                    if path[-1][0] == floor_path_x[-1] and path[-1][1] == floor_path_y[-1]:
+                                        floor_path_x[-1] += end_x_nudge
+                                        floor_path_y[-1] += end_y_nudge
+                                        
+                                    # --- END VISUAL CORRECTIONS ---
+                                
                                     # Draw Red Route Line
                                     fig.add_trace(go.Scatter(
                                         x=floor_path_x, y=floor_path_y, 
