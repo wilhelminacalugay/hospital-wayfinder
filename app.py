@@ -87,37 +87,51 @@ if net and db:
                         img_path = selected_floor["img"]
                         dx_min, dx_max, dy_min, dy_max = selected_floor["bounds"]
                         
+                        # ... [Image loading code stays the same] ...
+                        
                         img = Image.open(img_path)
                         
-                        # 1. Aspect Ratio Math
-                        img_w, img_h = img.width, img.height
-                        img_ratio = img_w / img_h
-                        
+                        # 1. Base Math
                         cad_w = dx_max - dx_min
                         cad_h = dy_max - dy_min
-                        true_image_height = cad_w / img_ratio
                         
-                        # 2. Apply your perfect offsets
+                        # ==========================================
+                        # THE CALIBRATION TUNERS
+                        # ==========================================
+                        # These values allow you to stretch or squash the math grid
+                        # to perfectly match your PNG export, preventing drift at the edges!
+                        
+                        # Start with 1.0 (no stretch). 
+                        # If the right side of the route floats too far right, lower this to 0.99
+                        x_stretch = 1.0  
+                        
+                        # If the top of the route floats too high, lower this to 0.99
+                        y_stretch = 1.0  
+                        
+                        # Your base offsets to center the map
                         x_offset = 300   
                         y_offset = -140   
                         
-                        y_center = dy_min + (cad_h / 2.0)
-                        y_adjusted_max = y_center + (true_image_height / 2.0) + float(y_offset)
-                        x_adjusted_min = dx_min + float(x_offset)
+                        # Apply Calibration
+                        calibrated_cad_w = cad_w * x_stretch
+                        calibrated_cad_h = cad_h * y_stretch
                         
-                        # 3. Draw Background Image
+                        # Draw Background Image with Calibration
                         fig.add_layout_image(
                             dict(
                                 source=img,
                                 xref="x", yref="y",
-                                x=x_adjusted_min, y=y_adjusted_max,
-                                sizex=cad_w,
-                                sizey=true_image_height,
+                                # Anchor the image from the bottom-left corner
+                                x=dx_min + float(x_offset), 
+                                y=dy_max + float(y_offset),
+                                sizex=calibrated_cad_w,
+                                sizey=calibrated_cad_h,
                                 sizing="stretch", 
                                 opacity=0.9,
                                 layer="below"
                             )
                         )
+                        # ... [The rest of your routing code stays exactly the same] ...
 
                         # 4. Draw the Route
                         if "SEQUENCE LIST" in result:
