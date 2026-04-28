@@ -3,35 +3,23 @@ import plotly.graph_objects as go
 from PIL import Image
 import networkx as nx
 
-# Set page layout to wide
-st.set_page_config(layout="wide", page_title="Smart Hospital Wayfinding")
+# ==========================================
+# PAGE CONFIGURATION
+# ==========================================
+st.set_page_config(page_title="Hospital Wayfinder", layout="wide")
+
+st.title("🏥 Smart Hospital Wayfinding System")
+st.markdown("### Interactive Decision-Support Dashboard")
 
 # ==========================================
-# SECTION 1: LOAD YOUR DATA
+# CACHE THE ALGORITHM
 # ==========================================
-# Replace this section with your actual code that loads the database and network graph.
-# Make sure 'db' (dictionary of coordinates) and 'net' (NetworkX graph) are defined here.
-# Example: 
-# db = load_my_database()
-# net = load_my_network()
+@st.cache_resource
+def load_hospital_data():
+    return build_hospital_graph("new block.dxf")
 
-
-# ==========================================
-# SECTION 2: SURGICAL NODE CORRECTIONS
-# ==========================================
-# Use this to fix specific rooms that you accidentally drew slightly off-center in AutoCAD.
-# This prevents you from having to redraw the entire CAD file.
-if 'db' in locals():  # Safety check to ensure db is loaded
-    node_corrections = {
-        # Add or adjust your stubborn rooms here
-        "PWD BATHROOM UG": (db["PWD BATHROOM UG"][0] + 500, db["PWD BATHROOM UG"][1] - 2000),
-    }
-
-    for room_name, new_coords in node_corrections.items():
-        if room_name in db:
-            db[room_name] = new_coords
-
-
+with st.spinner("Loading structural network geometry..."):
+    net, db = load_hospital_data()
 # ==========================================
 # SECTION 3: FLOOR DATA & MASTER BOUNDS
 # ==========================================
@@ -93,8 +81,8 @@ with map_col:
             true_image_height = cad_w / img_ratio
             
             # Put your "perfect offset values" here!
-            x_offset = 0   
-            y_offset = 0   
+            x_offset = 300   
+            y_offset = -140   
             
             y_center = dy_min + (cad_h / 2.0)
             y_adjusted_max = y_center + (true_image_height / 2.0) + float(y_offset)
