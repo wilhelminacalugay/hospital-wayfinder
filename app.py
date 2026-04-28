@@ -167,3 +167,5 @@ if net and db:
                         st.error(f"Mapping Error: {e}")
 else:
     st.error("System Offline: Could not load the hospital map data.")
+
+# Forcing a server rebuild
