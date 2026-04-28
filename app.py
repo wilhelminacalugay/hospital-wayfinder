@@ -45,13 +45,13 @@ MASTER_NORTH = -145093.6
 MASTER_BOUNDS = [MASTER_WEST, MASTER_EAST, MASTER_SOUTH, MASTER_NORTH]
 
 floor_data = {
-    "Lower Ground (LG)": {"img": "new-block_LG_EXPORT.png", "bounds": MASTER_BOUNDS},
-    "Upper Ground (UG)": {"img": "new-block_UG_EXPORT.png", "bounds": MASTER_BOUNDS},
-    "2nd Floor (2F)": {"img": "new-block_2F_EXPORT.png", "bounds": MASTER_BOUNDS},
-    "3rd Floor (3F)": {"img": "new-block_3F_EXPORT.png", "bounds": MASTER_BOUNDS},
-    "4th Floor (4F)": {"img": "new-block_4F_EXPORT.png", "bounds": MASTER_BOUNDS},
-    "5th Floor (5F)": {"img": "new-block_5F_EXPORT.png", "bounds": MASTER_BOUNDS},
-    "6th Floor (6F)": {"img": "new-block_6F_EXPORT.png", "bounds": MASTER_BOUNDS}
+    "Lower Ground (LG)": {"img": "new block-LG_EXPORT.png", "bounds": MASTER_BOUNDS},
+    "Upper Ground (UG)": {"img": "new block-UG_EXPORT.png", "bounds": MASTER_BOUNDS},
+    "2nd Floor (2F)": {"img": "new block-2F_EXPORT.png", "bounds": MASTER_BOUNDS},
+    "3rd Floor (3F)": {"img": "new block-3F_EXPORT.png", "bounds": MASTER_BOUNDS},
+    "4th Floor (4F)": {"img": "new block-4F_EXPORT.png", "bounds": MASTER_BOUNDS},
+    "5th Floor (5F)": {"img": "new block-5F_EXPORT.png", "bounds": MASTER_BOUNDS},
+    "6th Floor (6F)": {"img": "new block-6F_EXPORT.png", "bounds": MASTER_BOUNDS}
 }
 
 # ==========================================
