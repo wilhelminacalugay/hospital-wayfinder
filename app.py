@@ -87,12 +87,20 @@ if net and db:
                         img_path = selected_floor["img"]
                         dx_min, dx_max, dy_min, dy_max = selected_floor["bounds"]
                         
-                        # ... [Image loading code stays the same] ...
+                       # ... [Image loading code] ...
+                        img = Image.open(img_path)
                         
-                        # 1. Aspect Ratio Math (The Bulletproof Method)
-                        img_w, img_h = img.size  
-                        img_ratio = img_w / img_h
+                        # ==========================================
+                        # THE BULLETPROOF ASPECT RATIO BYPASS
+                        # ==========================================
+                        # Bypassing the server error by hardcoding the exact export size.
+                        # Put your actual PNG pixel dimensions right here:
+                        img_pixel_width = 1920   # <--- Change this to your PNG width!
+                        img_pixel_height = 1080  # <--- Change this to your PNG height!
                         
+                        img_ratio = img_pixel_width / img_pixel_height
+                        
+                        # AutoCAD Math
                         cad_w = dx_max - dx_min
                         cad_h = dy_max - dy_min
                         true_image_height = cad_w / img_ratio
@@ -108,16 +116,16 @@ if net and db:
                         x_offset = 300   
                         y_offset = -140   
                         
-                        # 2. Apply Calibration to the TRUE height!
+                        # Apply Calibration to the TRUE height!
                         calibrated_w = cad_w * float(x_stretch)
                         calibrated_h = true_image_height * float(y_stretch)
                         
-                        # 3. Calculate final anchor points
+                        # Calculate final anchor points
                         y_center = dy_min + (cad_h / 2.0)
                         y_adjusted_max = y_center + (calibrated_h / 2.0) + float(y_offset)
                         x_adjusted_min = dx_min + float(x_offset)
                         
-                        # 4. Draw the un-squished, calibrated background
+                        # Draw the un-squished, calibrated background
                         fig.add_layout_image(
                             dict(
                                 source=img,
