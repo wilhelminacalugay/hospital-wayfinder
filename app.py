@@ -153,6 +153,8 @@ if net and db:
                                 floor_path_x = []
                                 floor_path_y = []
                                 
+                                current_tag = selected_floor["tag"]
+                                
                                 for p in path:
                                     if current_tag in string_name_of_node: 
                                         floor_path_x.append(p[0])
