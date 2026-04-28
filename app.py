@@ -91,14 +91,30 @@ if net and db:
                         
                         img = Image.open(img_path)
                         
-                        # Add the background image (No nudging required!)
+                        # 1. Image Pixel Dimensions (Based on your high-res export)
+                        img_w = img.width
+                        img_h = img.height
+                        img_ratio = img_w / img_h
+                        
+                        # 2. AutoCAD Math Dimensions
+                        cad_w = dx_max - dx_min
+                        cad_h = dy_max - dy_min
+                        
+                        # 3. Calculate True Height to Prevent Squishing
+                        true_image_height = cad_w / img_ratio
+                        
+                        # Center the un-squished image vertically over the math box
+                        y_center = dy_min + (cad_h / 2)
+                        y_adjusted_max = y_center + (true_image_height / 2)
+                        
+                        # Add the background image
                         fig.add_layout_image(
                             dict(
                                 source=img,
                                 xref="x", yref="y",
-                                x=dx_min, y=dy_max,
-                                sizex=(dx_max - dx_min),
-                                sizey=(dy_max - dy_min),
+                                x=dx_min, y=y_adjusted_max,
+                                sizex=cad_w,
+                                sizey=true_image_height,
                                 sizing="stretch", 
                                 opacity=0.9,
                                 layer="below"
@@ -115,7 +131,6 @@ if net and db:
                                 floor_path_x = []
                                 floor_path_y = []
                                 
-                                # Only plot nodes that are actually on this floor's CAD space
                                 for p in path:
                                     if (dx_min - 500) <= p[0] <= (dx_max + 500) and (dy_min - 500) <= p[1] <= (dy_max + 500):
                                         floor_path_x.append(p[0])
@@ -165,7 +180,8 @@ if net and db:
                         
                     except Exception as e:
                         st.error(f"Mapping Error: {e}")
+                        
+                    except Exception as e:
+                        st.error(f"Mapping Error: {e}")
 else:
     st.error("System Offline: Could not load the hospital map data.")
-
-# Forcing a server rebuild
