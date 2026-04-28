@@ -89,8 +89,8 @@ if net and db:
                         
                         # ... [Image loading code stays the same] ...
                         
-                        # 1. Aspect Ratio Math (The Anti-Pancake Formula)
-                        img_w, img_h = img.width, img.height
+                        # 1. Aspect Ratio Math (The Bulletproof Method)
+                        img_w, img_h = img.size  
                         img_ratio = img_w / img_h
                         
                         cad_w = dx_max - dx_min
