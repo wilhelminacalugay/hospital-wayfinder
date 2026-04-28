@@ -153,10 +153,19 @@ if net and db:
                                 floor_path_x = []
                                 floor_path_y = []
                                 
-                                current_tag = selected_floor["tag"]
+                                # 1. Build a Reverse Lookup Dictionary (Coordinate -> String Name)
+                                coord_to_name = {tuple(coords): name for name, coords in db.items()}
                                 
+                                # 2. Get the tag for the floor we are currently looking at
+                                current_tag = selected_floor.get("tag", "")
+                                
+                                # 3. The Multi-Floor Slicer
                                 for p in path:
-                                    if current_tag in string_name_of_node: 
+                                    # Look up the string name for this specific math coordinate
+                                    node_name = coord_to_name.get(tuple(p), "")
+                                    
+                                    # If the current map's tag (e.g., "UG") is inside the node's name, draw it!
+                                    if current_tag in node_name:
                                         floor_path_x.append(p[0])
                                         floor_path_y.append(p[1])
                                 
