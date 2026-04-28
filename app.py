@@ -78,7 +78,24 @@ if net and db:
                     st.markdown("### Recommended Itinerary")
                     st.success("Routing Complete.")
                     st.code(result, language="markdown")
-                
+# ==========================================
+# SURGICAL NODE CORRECTIONS
+# ==========================================
+# If a specific room's node is floating off the map, 
+# enter its name here and tweak its X, Y coordinates.
+node_corrections = {
+    # Example: Moving the PWD Bathroom down by 2000 units and right by 500 units.
+    # You will need to tweak these numbers until it lands perfectly in the room!
+    "PWD BATHROOM UG": (db["PWD BATHROOM UG"][0] + 500, db["PWD BATHROOM UG"][1] - 2000),
+    
+    # You can add others here if you find them!
+    # "ANOTHER ROOM": (db["ANOTHER ROOM"][0] + X_NUDGE, db["ANOTHER ROOM"][1] + Y_NUDGE),
+}
+
+# Apply corrections to the active database
+for room_name, new_coords in node_corrections.items():
+    if room_name in db:
+        db[room_name] = new_coords  
                 with map_col:
                     st.markdown(f"### 🗺️ Structural Spatial Map: {view_floor}")
                     
