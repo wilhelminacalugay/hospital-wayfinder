@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from PIL import Image
 
 # Import the logic we built in your backend
-from hospital_route import build_hospital_graph, get_restrictions
+from hospital_router import build_hospital_graph, get_restrictions
 
 # ==========================================
 # SETUP & CONFIG
