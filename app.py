@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from PIL import Image
 
 # Import the logic we built in your backend
-from hospital_router import build_hospital_graph, get_restrictions
+from hospital_router import build_hospital_graph, get_restrictions, find_optimized_paths
 
 # ==========================================
 # SETUP & CONFIG
@@ -153,6 +153,17 @@ if st.sidebar.button("Calculate Route"):
                 
                 # Display Success
                 st.success("Route generated successfully!")
+                
+                # ==========================================
+                # ADD THE TEXT ITINERARY & OPTIONS HERE!
+                # ==========================================
+                st.markdown("### 📋 Step-by-Step Itinerary & Options")
+                
+                # Call your backend Operations Research function to get the text table
+                itinerary_text = find_optimized_paths(graph, destinations, start_room, end_room, selected_role)
+                
+                # Print it using st.text() so it keeps your perfect column spacing!
+                st.text(itinerary_text)
                 
             except nx.NetworkXNoPath:
                 st.error(f"No valid path found for {selected_role} between these locations.")
