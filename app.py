@@ -77,7 +77,7 @@ if st.sidebar.button("Calculate Route"):
                 fig = go.Figure()
                 
                 # Load Background Image (Ensure PNG is in the same folder)
-                img_path = "new_block_UG_EXPORT.png" 
+                img_path = "new block-UG_EXPORT.png" 
                 
                 try:
                     img = Image.open(img_path)
