@@ -202,10 +202,14 @@ def build_hospital_graph(dxf_file_path):
         "WATER TANK AREA 1": "", "WATER TANK AREA 2": "",
     }
 
-    # 1. Group lines by their DXF layer so we don't lose the floor data
+    # ==========================================
+    # 1. GROUP LINES BY DXF LAYER
+    # ==========================================
     lines_by_layer = {}
     for entity in msp.query('LWPOLYLINE LINE'):
-        layer_name = entity.dxf.layer.upper() # e.g., 'UG', 'F1'
+        # THIS is where layer_name is officially defined!
+        layer_name = entity.dxf.layer.upper() 
+        
         if layer_name not in lines_by_layer:
             lines_by_layer[layer_name] = []
             
@@ -217,8 +221,11 @@ def build_hospital_graph(dxf_file_path):
             for i in range(len(pts)-1):
                 if pts[i] != pts[i+1]: lines_by_layer[layer_name].append(LineString([pts[i], pts[i+1]]))
 
-    # 2. Merge lines ONLY within their specific floor/layer
-    for layer_name, raw_lines in lines_by_layer.items():
+    # ==========================================
+    # 2. MERGE & BUILD GRAPH BY LAYER
+    # ==========================================
+    # The loop passes layer_name down to the node creation
+    for layer_name, raw_lines in lines_by_layer.items(): 
         merged = unary_union(raw_lines)
         clean_lines = list(merged.geoms) if merged.geom_type == 'MultiLineString' else [merged]
 
@@ -227,25 +234,14 @@ def build_hospital_graph(dxf_file_path):
             for i in range(len(coords)-1):
                 dist_m = calculate_distance(coords[i], coords[i+1]) / 1000.0
                 
-                # Add the edge
+                # Create the nodes with the layer attribute explicitly attached
+                G.add_node(coords[i], layer=layer_name)
+                G.add_node(coords[i+1], layer=layer_name)
+                
+                # Connect the nodes
                 G.add_edge(coords[i], coords[i+1], weight=dist_m / SPEED_FLAT)
                 
-                # Assign the floor/layer to the individual nodes! 
-                # This is what app.py needs for the Z-Axis Slicer.
-                G.nodes[coords[i]]['layer'] = layer_name
-                G.nodes[coords[i+1]]['layer'] = layer_name
-                
                 all_endpoints.update([coords[i], coords[i+1]])
-
-    merged = unary_union(raw_lines)
-    clean_lines = list(merged.geoms) if merged.geom_type == 'MultiLineString' else [merged]
-
-    for line in clean_lines:
-        coords = list(line.coords)
-        for i in range(len(coords)-1):
-            dist_m = calculate_distance(coords[i], coords[i+1]) / 1000.0
-            G.add_edge(coords[i], coords[i+1], weight=dist_m / SPEED_FLAT)
-            all_endpoints.update([coords[i], coords[i+1]])
 
     for entity in msp.query('TEXT MTEXT'):
         txt = entity.plain_text().strip().upper() if entity.dxftype() == 'MTEXT' else entity.dxf.text.strip().upper()
@@ -271,21 +267,11 @@ def build_hospital_graph(dxf_file_path):
 
     for base, floors in portals.items():
         floors.sort(key=lambda x: x[0])
-        for i in range(len(coords)-1):
-                dist_m = calculate_distance(coords[i], coords[i+1]) / 1000.0
-                
-                # EXPLICITLY create the nodes with the layer attribute FIRST
-                G.add_node(coords[i], layer=layer_name)
-                G.add_node(coords[i+1], layer=layer_name)
-                
-                # THEN add the edge connecting them
-                G.add_edge(coords[i], coords[i+1], weight=dist_m / SPEED_FLAT)
-                
-                all_endpoints.update([coords[i], coords[i+1]])
-                f1_n, n1, p1 = floors[i]; f2_n, n2, p2 = floors[i+1]
-                diff = abs(f2_n - f1_n)
-                cost = (diff*3.5)/SPEED_STAIR_UP if "STAIR" in base else ELEV_WAIT_TIME+ELEV_DOOR_CYCLE+(diff*ELEV_TIME_PER_FLOOR)
-                G.add_edge(p1, p2, weight=cost)
+        for i in range(len(floors)-1):
+            f1_n, n1, p1 = floors[i]; f2_n, n2, p2 = floors[i+1]
+            diff = abs(f2_n - f1_n)
+            cost = (diff*3.5)/SPEED_STAIR_UP if "STAIR" in base else ELEV_WAIT_TIME+ELEV_DOOR_CYCLE+(diff*ELEV_TIME_PER_FLOOR)
+            G.add_edge(p1, p2, weight=cost)
 
     return apply_congestion(G), destinations
 
