@@ -3,6 +3,7 @@ import networkx as nx
 import plotly.graph_objects as go
 import os
 from PIL import Image
+import base64
 
 from hospital_router import build_hospital_graph, get_restrictions, find_optimized_paths
 
@@ -144,17 +145,23 @@ if st.session_state.route_active:
     dx_min, dx_max, dy_min, dy_max = MASTER_BOUNDS
     fig = go.Figure()
     
+   # ---------------------------------------------------------
+    # IMAGE DEBUGGER & LOADER (Base64 Web-Safe Version)
     # ---------------------------------------------------------
-    # IMAGE DEBUGGER & LOADER
-    # ---------------------------------------------------------
-    # Update this string structure to match EXACTLY how your PNGs are named
     img_path = f"new block-{active_floor}_EXPORT.png" 
     
     if os.path.exists(img_path):
+        # 1. Open with PIL just to get the width/height math
         img = Image.open(img_path)
         img_w, img_h = img.size  
         img_ratio = img_w / img_h
         
+        # 2. Encode the image to Base64 so Plotly guarantees rendering in the browser
+        with open(img_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode()
+        img_uri = f"data:image/png;base64,{encoded_string}"
+        
+        # 3. "Anti-Pancake" Bounding Box Math
         cad_w = dx_max - dx_min
         cad_h = dy_max - dy_min
         true_image_height = cad_w / img_ratio
@@ -162,11 +169,14 @@ if st.session_state.route_active:
         y_center = dy_min + (cad_h / 2.0)
         y_adjusted_max = y_center + (true_image_height / 2.0)
         
+        # 4. Inject the Base64 Image into Plotly with Explicit Anchors
         fig.add_layout_image(
             dict(
-                source=img,
+                source=img_uri,      # Using the Base64 URI instead of the raw PIL object
                 xref="x", yref="y",
                 x=dx_min, y=y_adjusted_max,
+                xanchor="left",      # Explicitly lock the X anchor
+                yanchor="top",       # Explicitly lock the Y anchor
                 sizex=cad_w,
                 sizey=true_image_height,
                 sizing="stretch", 
@@ -175,7 +185,6 @@ if st.session_state.route_active:
             )
         )
     else:
-        # If the image is missing, the app will explicitly tell you what filename it was looking for
         st.error(f"⚠️ Image Missing: The app is looking for an image named exactly '{img_path}' in your folder but cannot find it. Please rename your PNG file to match this string.")
         
     # Draw ONLY the path segment for this specific step in the journey
