@@ -362,7 +362,7 @@ def find_optimized_paths(graph, destinations, start, end, role):
         
         for p in raw_paths:
             # ---------------------------------------------------------
-            # THE STRICT UNIDIRECTIONAL FILTER
+            # FILTER 1: UNIDIRECTIONAL & ANTI-BOUNCE
             # ---------------------------------------------------------
             visited_floors = []
             for node in p:
@@ -372,11 +372,9 @@ def find_optimized_paths(graph, destinations, start, end, role):
             
             is_valid = True
             
-            # Rule 1: No U-Turns (No duplicate floors allowed)
             if len(visited_floors) != len(set(visited_floors)):
                 is_valid = False
                 
-            # Rule 2: No V-Shapes (Strictly one-way vertical travel)
             if is_valid and len(visited_floors) > 2:
                 elevations = [FLOOR_ELEVATION.get(f, -1) for f in visited_floors]
                 direction = None
@@ -389,13 +387,15 @@ def find_optimized_paths(graph, destinations, start, end, role):
                     if direction is None:
                         direction = current_dir
                     elif direction != current_dir:
-                        is_valid = False # They changed directions! Kill the route.
+                        is_valid = False 
                         break
             
             if not is_valid:
                 continue 
                     
-            # --- THE TRANSIT HOP ANALYZER ---
+            # ---------------------------------------------------------
+            # FILTER 2: THE STRICT TRANSFER BAN
+            # ---------------------------------------------------------
             transit_hops = 0
             was_on_transit = False
             uses_elev = False
@@ -414,6 +414,10 @@ def find_optimized_paths(graph, destinations, start, end, role):
                     transit_hops += 1
                 was_on_transit = is_transit
             
+            # THE HARD BAN: If they hop onto transit more than once, KILL IT.
+            if transit_hops > 1:
+                continue
+            
             is_mixed = 1 if (uses_elev and uses_stair) else 0
             real_weight = sum(safe_G[p[i]][p[i+1]]['weight'] for i in range(len(p)-1))
             
@@ -425,7 +429,7 @@ def find_optimized_paths(graph, destinations, start, end, role):
             })
             
         if not scored_paths:
-            return "No logical alternatives found.", []
+            return "No logical alternatives found. Graph connection error.", []
             
         # 2. THE GOLDEN SORT
         scored_paths.sort(key=lambda x: (x['is_mixed'], x['transit_hops'], x['weight']))
