@@ -271,11 +271,21 @@ def build_hospital_graph(dxf_file_path):
 
     for base, floors in portals.items():
         floors.sort(key=lambda x: x[0])
-        for i in range(len(floors)-1):
-            f1_n, n1, p1 = floors[i]; f2_n, n2, p2 = floors[i+1]
-            diff = abs(f2_n - f1_n)
-            cost = (diff*3.5)/SPEED_STAIR_UP if "STAIR" in base else ELEV_WAIT_TIME+ELEV_DOOR_CYCLE+(diff*ELEV_TIME_PER_FLOOR)
-            G.add_edge(p1, p2, weight=cost)
+        for i in range(len(coords)-1):
+                dist_m = calculate_distance(coords[i], coords[i+1]) / 1000.0
+                
+                # EXPLICITLY create the nodes with the layer attribute FIRST
+                G.add_node(coords[i], layer=layer_name)
+                G.add_node(coords[i+1], layer=layer_name)
+                
+                # THEN add the edge connecting them
+                G.add_edge(coords[i], coords[i+1], weight=dist_m / SPEED_FLAT)
+                
+                all_endpoints.update([coords[i], coords[i+1]])
+                f1_n, n1, p1 = floors[i]; f2_n, n2, p2 = floors[i+1]
+                diff = abs(f2_n - f1_n)
+                cost = (diff*3.5)/SPEED_STAIR_UP if "STAIR" in base else ELEV_WAIT_TIME+ELEV_DOOR_CYCLE+(diff*ELEV_TIME_PER_FLOOR)
+                G.add_edge(p1, p2, weight=cost)
 
     return apply_congestion(G), destinations
 
