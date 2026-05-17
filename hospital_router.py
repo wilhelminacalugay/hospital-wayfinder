@@ -317,8 +317,6 @@ def get_restrictions(role):
     return []
 
 # --- THE FULLY ASSEMBLED SMART ITINERARY GENERATOR ---
-import itertools
-
 def find_optimized_paths(graph, destinations, start, end, role):
     if start not in destinations or end not in destinations:
         return "Start or Destination not found in database.", []
@@ -332,7 +330,7 @@ def find_optimized_paths(graph, destinations, start, end, role):
     if s_node not in safe_G or e_node not in safe_G:
         return f"Access Denied: This route crosses through restricted areas for a {role}.", []
 
-    # 1. THE BOARDING PENALTY (Prevents Stair-Hopping)
+    # 1. THE BOARDING PENALTY
     routing_G = safe_G.copy()
     for u, v, d in routing_G.edges(data=True):
         u_label = routing_G.nodes[u].get('label', '').upper()
@@ -349,11 +347,11 @@ def find_optimized_paths(graph, destinations, start, end, role):
     try:
         raw_paths = list(itertools.islice(nx.shortest_simple_paths(routing_G, s_node, e_node, weight='weight'), 20))
         
-        # 2. THE FILTERS
-        logical_paths = [raw_paths[0]] 
+        # 2. THE STRICT HUMAN-LOGIC FILTERS
+        logical_paths = [raw_paths[0]] # Option 1 gets Golden Exemption
         
         for p in raw_paths[1:]:
-            # Check 1: The Anti-Bounce Filter
+            # --- Check A: Anti-Bounce (No returning to previous floors) ---
             visited_floors = []
             is_valid = True
             for node in p:
@@ -365,17 +363,29 @@ def find_optimized_paths(graph, destinations, start, end, role):
                     visited_floors.append(floor)
             
             if not is_valid:
-                continue # Bounced! Skip to the next path.
+                continue 
                 
-            # Check 2: The Anti-Clone Filter (Lobby Grouping)
-            # If this path shares 80% of its footsteps with an already approved path, it's just a different elevator door.
+            # --- Check B: The One-Ride Limit (No silly transfers) ---
+            boardings = 0
+            was_on_transit = False
+            for node in p:
+                label = safe_G.nodes[node].get('label', '').upper()
+                is_transit = "ELEV" in label or "STAIR" in label
+                
+                # If they step onto a transit node from a hallway, count it as a boarding
+                if is_transit and not was_on_transit:
+                    boardings += 1
+                was_on_transit = is_transit
+                
+            if boardings > 1:
+                continue # Destroy the route! They shouldn't have to transfer.
+
+            # --- Check C: Anti-Clone (No identical routes using different lobby doors) ---
             is_clone = False
             p_set = set(p)
             for approved_path in logical_paths:
                 approved_set = set(approved_path)
-                # Calculate the percentage of overlapping nodes
                 overlap = len(p_set.intersection(approved_set)) / min(len(p_set), len(approved_set))
-                
                 if overlap > 0.80:
                     is_clone = True
                     break
@@ -383,7 +393,6 @@ def find_optimized_paths(graph, destinations, start, end, role):
             if not is_clone:
                 logical_paths.append(p)
                 
-            # Once we have 3 genuinely different routes, stop calculating
             if len(logical_paths) == 3:
                 break
                 
