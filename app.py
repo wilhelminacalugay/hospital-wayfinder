@@ -110,33 +110,41 @@ if st.sidebar.button("Calculate Route"):
                 path = nx.shortest_path(safe_G, s_node, e_node, weight='weight')
                 
                 # ---------------------------------------------------------
-                # NEW: THE LINEAR SEGMENT SLICER
-                # Breaks the route at vertical transit nodes (Elevators/Stairs)
+                # THE COORDINATE-BASED SLICER (NO CAD LAYERS!)
+                # This mathematically scans the Y-axis to figure out the floor.
                 # ---------------------------------------------------------
                 segments = []
-                current_floor = safe_G.nodes[path[0]].get('layer', 'UG').upper()
+                
+                # Grab the X and Y coordinates of the very first step
+                first_x = path[0][0]
+                first_y = path[0][1]
+                
+                # Use our new math function instead of .get('layer')
+                current_floor = get_floor_from_coords(first_x, first_y)
                 current_x = []
                 current_y = []
                 
                 for p in path:
-                    node_layer = safe_G.nodes[p].get('layer', 'UG').upper()
+                    node_x = p[0]
+                    node_y = p[1]
+                    node_floor = get_floor_from_coords(node_x, node_y)
                     
-                    if node_layer == current_floor:
-                        current_x.append(p[0])
-                        current_y.append(p[1])
+                    if node_floor == current_floor:
+                        current_x.append(node_x)
+                        current_y.append(node_y)
                     else:
-                        # Floor change detected! Cap off the previous floor's route.
+                        # We detected a massive jump on the Y-axis (Elevator)
                         segments.append({
                             'floor': current_floor,
                             'x': current_x,
                             'y': current_y
                         })
-                        # Start the new floor's route EXACTLY at the new transit node
-                        current_floor = node_layer
-                        current_x = [p[0]]
-                        current_y = [p[1]]
+                        # Start tracking the new floor
+                        current_floor = node_floor
+                        current_x = [node_x]
+                        current_y = [node_y]
                 
-                # Catch the final segment after the loop finishes
+                # Catch the final segment
                 if len(current_x) > 0:
                     segments.append({
                         'floor': current_floor,
@@ -144,6 +152,7 @@ if st.sidebar.button("Calculate Route"):
                         'y': current_y
                     })
                 
+                # Save to session state
                 st.session_state.route_segments = segments
                 st.session_state.route_active = True
                 st.session_state.itinerary_text = find_optimized_paths(
