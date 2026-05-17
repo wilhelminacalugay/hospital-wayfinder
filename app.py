@@ -180,7 +180,9 @@ if st.session_state.route_active:
     # --- PLOTLY MAP VISUALIZATION ---
     # --- PLOTLY MAP VISUALIZATION ---
     # We dynamically grab the specific bounding box for the active floor!
-    dx_min, dx_max, dy_min, dy_max = FLOOR_BOUNDS[active_floor]
+    # Safely fetch the bounds. If the memory is corrupted or unknown, default to UG.
+    bounds = FLOOR_BOUNDS.get(active_floor, FLOOR_BOUNDS["UG"])
+    dx_min, dx_max, dy_min, dy_max = bounds
     fig = go.Figure()
     
    # ---------------------------------------------------------
