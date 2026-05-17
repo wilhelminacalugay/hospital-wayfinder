@@ -329,33 +329,32 @@ def find_optimized_paths(graph, destinations, start, end, role):
     
     if s_node not in safe_G or e_node not in safe_G:
         return f"Access Denied: This route crosses through restricted areas for a {role}.", []
-
-    try:
-        raw_paths = list(itertools.islice(nx.shortest_simple_paths(safe_G, s_node, e_node, weight='weight'), 20))
+        try:
+            raw_paths = list(itertools.islice(nx.shortest_simple_paths(safe_G, s_node, e_node, weight='weight'), 20))
         
-        # 1. We start the list by automatically saving Option 1 (raw_paths[0])
-        logical_paths = [raw_paths[0]] 
+            # 1. We start the list by automatically saving Option 1 (raw_paths[0])
+            logical_paths = [raw_paths[0]] 
         
-        # 2. We add [1:] so the filter only tests Option 2 through 20
-        for p in raw_paths[1:]:
-            visited_floors = []
-            is_valid = True
-            for node in p:
-                floor = get_floor_from_y(node[1])
-                if not visited_floors or visited_floors[-1] != floor:
-                    if floor in visited_floors:
-                        is_valid = False 
-                        break
-                    visited_floors.append(floor)
-            if is_valid:
-                logical_paths.append(p)
+            # 2. We add [1:] so the filter only tests Option 2 through 20
+            for p in raw_paths[1:]:
+                visited_floors = []
+                is_valid = True
+                for node in p:
+                    floor = get_floor_from_y(node[1])
+                    if not visited_floors or visited_floors[-1] != floor:
+                        if floor in visited_floors:
+                            is_valid = False 
+                            break
+                        visited_floors.append(floor)
+                if is_valid:
+                    logical_paths.append(p)
                 
-        final_paths = logical_paths[:3]
+            final_paths = logical_paths[:3]
         
-        if not final_paths:
-            return "No logical alternatives found.", []
+            if not final_paths:
+                return "No logical alternatives found.", []
 
-        output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
+            output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
         
         # ... (The rest of your step_sequence and output code remains exactly the same)
         
