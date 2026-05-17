@@ -63,7 +63,7 @@ if 'route_segments' not in st.session_state:
 # ==========================================
 st.sidebar.header("Navigation Setup")
 
-roles = ["PATIENT", "VISITOR", "DOCTOR", "STAFF", "PWD"]
+roles = ["PATIENT", "VISITOR", "NURSE", "DOCTOR", "STAFF", "PWD"]
 selected_role = st.sidebar.selectbox("Select User Role", roles)
 
 room_names = sorted(list(destinations.keys()))
