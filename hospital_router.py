@@ -330,28 +330,14 @@ def find_optimized_paths(graph, destinations, start, end, role):
     if s_node not in safe_G or e_node not in safe_G:
         return f"Access Denied: This route crosses through restricted areas for a {role}.", []
 
-    # 1. THE BOARDING PENALTY
-    routing_G = safe_G.copy()
-    for u, v, d in routing_G.edges(data=True):
-        u_label = routing_G.nodes[u].get('label', '').upper()
-        v_label = routing_G.nodes[v].get('label', '').upper()
-        
-        u_is_stair = "STAIR" in u_label
-        v_is_stair = "STAIR" in v_label
-        u_is_elev = "ELEV" in u_label
-        v_is_elev = "ELEV" in v_label
-        
-        if (u_is_stair != v_is_stair) or (u_is_elev != v_is_elev):
-            d['weight'] += 50000 
-            
     try:
-        raw_paths = list(itertools.islice(nx.shortest_simple_paths(routing_G, s_node, e_node, weight='weight'), 20))
+        # 1. Generate 50 raw paths to give us plenty of options to sort through
+        raw_paths = list(itertools.islice(nx.shortest_simple_paths(safe_G, s_node, e_node, weight='weight'), 50))
         
-        # 2. THE STRICT HUMAN-LOGIC FILTERS
-        logical_paths = [raw_paths[0]] # Option 1 gets Golden Exemption
+        scored_paths = []
         
-        for p in raw_paths[1:]:
-            # --- Check A: Anti-Bounce (No returning to previous floors) ---
+        for p in raw_paths:
+            # --- Anti-Bounce Filter ---
             visited_floors = []
             is_valid = True
             for node in p:
@@ -365,31 +351,50 @@ def find_optimized_paths(graph, destinations, start, end, role):
             if not is_valid:
                 continue 
                 
-            # --- Check B: The One-Ride Limit (No silly transfers) ---
-            boardings = 0
-            was_on_transit = False
-            for node in p:
-                label = safe_G.nodes[node].get('label', '').upper()
-                is_transit = "ELEV" in label or "STAIR" in label
-                
-                if is_transit and not was_on_transit:
-                    boardings += 1
-                was_on_transit = is_transit
-                
-                # THE FIX: If they board a second time, flag the route as dead and break!
-                if boardings > 1:
-                    is_valid = False 
-                    break 
+            # --- THE STRUCTURAL MOVE ANALYZER ---
+            moves = []
+            for i in range(len(p)-1):
+                f1 = get_floor_from_y(p[i][1])
+                f2 = get_floor_from_y(p[i+1][1])
+                if f1 != f2:
+                    moves.append('V') # Vertical jump between floors
+                else:
+                    moves.append('H') # Horizontal walk on the same floor
                     
-            # NOW we tell the outer loop to throw the entire route in the trash
-            if not is_valid:
-                continue
-
-            # --- Check C: Anti-Clone (No identical routes using different lobby doors) ---
+            # Compress consecutive moves (e.g., H, H, V, V, H becomes H, V, H)
+            compressed = []
+            for m in moves:
+                if not compressed or compressed[-1] != m:
+                    compressed.append(m)
+            
+            # Count how many separate vertical rides there are
+            v_count = compressed.count('V')
+            
+            # Calculate absolute distance
+            weight = sum(safe_G[p[i]][p[i+1]]['weight'] for i in range(len(p)-1))
+            
+            scored_paths.append({
+                'path': p,
+                'v_count': v_count,
+                'weight': weight
+            })
+            
+        if not scored_paths:
+            return "No logical alternatives found.", []
+            
+        # --- THE GOLDEN SORT ---
+        # This mathematically FORCES routes with the fewest transfers to the top!
+        # A 1-ride path that is slightly longer will ALWAYS beat a 2-ride path.
+        scored_paths.sort(key=lambda x: (x['v_count'], x['weight']))
+        
+        # --- Anti-Clone Filter ---
+        logical_paths = []
+        for sp in scored_paths:
+            p = sp['path']
             is_clone = False
             p_set = set(p)
-            for approved_path in logical_paths:
-                approved_set = set(approved_path)
+            for approved in logical_paths:
+                approved_set = set(approved)
                 overlap = len(p_set.intersection(approved_set)) / min(len(p_set), len(approved_set))
                 if overlap > 0.80:
                     is_clone = True
@@ -402,11 +407,8 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 break
                 
         final_paths = logical_paths
-        
-        if not final_paths:
-            return "No logical alternatives found.", []
 
-        # 3. THE ITINERARY BUILDER
+        # --- THE ITINERARY BUILDER ---
         output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
         
         for i, path in enumerate(final_paths, 1):
