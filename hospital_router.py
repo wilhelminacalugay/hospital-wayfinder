@@ -331,17 +331,13 @@ def find_optimized_paths(graph, destinations, start, end, role):
         return f"Access Denied: This route crosses through restricted areas for a {role}.", []
 
     try:
-        # Generate 50 raw paths
         raw_paths = list(itertools.islice(nx.shortest_simple_paths(safe_G, s_node, e_node, weight='weight'), 50))
         
         scored_paths = []
         
         for idx, p in enumerate(raw_paths):
-            # ---------------------------------------------------------
-            # THE GOLDEN ROUTE EXEMPTION IS BACK!
-            # Only run the Anti-Bounce filter on Options 2 through 50.
-            # ---------------------------------------------------------
-            if idx > 0: 
+            # --- Anti-Bounce Filter (Option 1 Exempt) ---
+            if idx > 0:
                 visited_floors = []
                 is_valid = True
                 for node in p:
@@ -353,10 +349,9 @@ def find_optimized_paths(graph, destinations, start, end, role):
                         visited_floors.append(floor)
                 
                 if not is_valid:
-                    continue # Route bounced! Skip it.
+                    continue 
                     
-            # --- THE STRUCTURAL MOVE ANALYZER ---
-            # (This part stays exactly the same, it scores Option 1 + all valid alternatives)
+            # --- Structural Move Analyzer ---
             moves = []
             for i in range(len(p)-1):
                 f1 = get_floor_from_y(p[i][1])
@@ -366,31 +361,35 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 else:
                     moves.append('H')
                     
-            # Compress consecutive moves (e.g., H, H, V, V, H becomes H, V, H)
             compressed = []
             for m in moves:
                 if not compressed or compressed[-1] != m:
                     compressed.append(m)
-            
-            # Count how many separate vertical rides there are
             v_count = compressed.count('V')
             
-            # Calculate absolute distance
             weight = sum(safe_G[p[i]][p[i+1]]['weight'] for i in range(len(p)-1))
+            
+            # --- THE PURE TRANSIT DETECTOR ---
+            # Detects if a route forces a human to mix elevators and stairs
+            uses_elev = any("ELEV" in safe_G.nodes[n].get('label', '').upper() for n in p)
+            uses_stair = any("STAIR" in safe_G.nodes[n].get('label', '').upper() for n in p)
+            is_mixed = 1 if (uses_elev and uses_stair) else 0
             
             scored_paths.append({
                 'path': p,
                 'v_count': v_count,
+                'is_mixed': is_mixed,
                 'weight': weight
             })
             
         if not scored_paths:
             return "No logical alternatives found.", []
             
-        # --- THE GOLDEN SORT ---
-        # This mathematically FORCES routes with the fewest transfers to the top!
-        # A 1-ride path that is slightly longer will ALWAYS beat a 2-ride path.
-        scored_paths.sort(key=lambda x: (x['v_count'], x['weight']))
+        # --- THE NEW GOLDEN SORT ---
+        # Priority 1: is_mixed (0 beats 1 -> Pure routes ALWAYS beat mixed routes)
+        # Priority 2: v_count (1 ride ALWAYS beats 2 rides)
+        # Priority 3: weight (Shortest walking distance wins ties)
+        scored_paths.sort(key=lambda x: (x['is_mixed'], x['v_count'], x['weight']))
         
         # --- Anti-Clone Filter ---
         logical_paths = []
