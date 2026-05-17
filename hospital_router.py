@@ -354,20 +354,23 @@ def find_optimized_paths(graph, destinations, start, end, role):
         scored_paths = []
         
         for idx, p in enumerate(raw_paths):
-            # --- Anti-Bounce Filter (Option 1 Exempt) ---
-            if idx > 0:
-                visited_floors = []
-                is_valid = True
-                for node in p:
-                    floor = get_floor_from_y(node[1])
-                    if not visited_floors or visited_floors[-1] != floor:
-                        if floor in visited_floors:
-                            is_valid = False 
-                            break
-                        visited_floors.append(floor)
-                
-                if not is_valid:
-                    continue 
+            
+            # ---------------------------------------------------------
+            # THE ANTI-BOUNCE FILTER (NO EXEMPTIONS!)
+            # Every single path, including Option 1, must pass this test.
+            # ---------------------------------------------------------
+            visited_floors = []
+            is_valid = True
+            for node in p:
+                floor = get_floor_from_y(node[1])
+                if not visited_floors or visited_floors[-1] != floor:
+                    if floor in visited_floors:
+                        is_valid = False 
+                        break
+                    visited_floors.append(floor)
+            
+            if not is_valid:
+                continue # Route bounced! Destroy it immediately.
                     
             # --- THE TRANSIT HOP ANALYZER ---
             transit_hops = 0
