@@ -317,8 +317,6 @@ def get_restrictions(role):
     return []
 
 # --- THE FULLY ASSEMBLED SMART ITINERARY GENERATOR ---
-import itertools
-
 def find_optimized_paths(graph, destinations, start, end, role):
     if start not in destinations or end not in destinations:
         return "Start or Destination not found in database.", []
@@ -332,11 +330,29 @@ def find_optimized_paths(graph, destinations, start, end, role):
     if s_node not in safe_G or e_node not in safe_G:
         return f"Access Denied: This route crosses through restricted areas for a {role}.", []
 
+    # ---------------------------------------------------------
+    # 1. THE "ANTI-HOPPING" BOARDING PENALTY
+    # ---------------------------------------------------------
+    routing_G = safe_G.copy()
+    for u, v, d in routing_G.edges(data=True):
+        u_label = routing_G.nodes[u].get('label', '').upper()
+        v_label = routing_G.nodes[v].get('label', '').upper()
+        
+        u_is_stair = "STAIR" in u_label
+        v_is_stair = "STAIR" in v_label
+        u_is_elev = "ELEV" in u_label
+        v_is_elev = "ELEV" in v_label
+        
+        # Penalize crossing the threshold between Hallways, Stairs, and Elevators
+        if (u_is_stair != v_is_stair) or (u_is_elev != v_is_elev):
+            d['weight'] += 50000 # Add a massive artificial distance penalty
+            
     try:
-        raw_paths = list(itertools.islice(nx.shortest_simple_paths(safe_G, s_node, e_node, weight='weight'), 20))
+        # We calculate routes using the heavily penalized routing_G to force stickiness
+        raw_paths = list(itertools.islice(nx.shortest_simple_paths(routing_G, s_node, e_node, weight='weight'), 20))
         
         # ---------------------------------------------------------
-        # THE GOLDEN ROUTE EXEMPTION
+        # 2. THE GOLDEN ROUTE & ANTI-BOUNCE FILTER
         # ---------------------------------------------------------
         logical_paths = [raw_paths[0]] 
         
@@ -359,7 +375,7 @@ def find_optimized_paths(graph, destinations, start, end, role):
             return "No logical alternatives found.", []
 
         # ---------------------------------------------------------
-        # THE ITINERARY BUILDER
+        # 3. THE ITINERARY BUILDER
         # ---------------------------------------------------------
         output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
         
@@ -373,6 +389,7 @@ def find_optimized_paths(graph, destinations, start, end, role):
             
             for j, node in enumerate(path):
                 node_floor = get_floor_from_y(node[1])
+                # We read the real, unpenalized labels from safe_G for the text output
                 node_label = safe_G.nodes[node].get('label', '').upper()
                 
                 if node_floor != current_floor:
