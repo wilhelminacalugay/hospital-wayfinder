@@ -330,8 +330,26 @@ def find_optimized_paths(graph, destinations, start, end, role):
     if s_node not in safe_G or e_node not in safe_G:
         return f"Access Denied: This route crosses through restricted areas for a {role}.", []
 
+    # ---------------------------------------------------------
+    # 1. THE BOARDING PENALTY (The Graph Poison)
+    # We heavily penalize entering/exiting transit so Yen's algorithm 
+    # is forced to physically hunt down 1-ride routes.
+    # ---------------------------------------------------------
+    routing_G = safe_G.copy()
+    for u, v, d in routing_G.edges(data=True):
+        u_label = routing_G.nodes[u].get('label', '').upper()
+        v_label = routing_G.nodes[v].get('label', '').upper()
+        
+        u_is_transit = "ELEV" in u_label or "STAIR" in u_label
+        v_is_transit = "ELEV" in v_label or "STAIR" in v_label
+        
+        # If one node is a hallway and the next is transit, add 50,000 distance
+        if u_is_transit != v_is_transit:
+            d['weight'] += 50000 
+
     try:
-        raw_paths = list(itertools.islice(nx.shortest_simple_paths(safe_G, s_node, e_node, weight='weight'), 50))
+        # Generate paths using the POISONED graph (routing_G)
+        raw_paths = list(itertools.islice(nx.shortest_simple_paths(routing_G, s_node, e_node, weight='weight'), 50))
         
         scored_paths = []
         
@@ -351,7 +369,7 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 if not is_valid:
                     continue 
                     
-            # --- THE NEW TRANSIT HOP ANALYZER ---
+            # --- THE TRANSIT HOP ANALYZER ---
             transit_hops = 0
             was_on_transit = False
             uses_elev = False
@@ -366,28 +384,28 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 if is_elev: uses_elev = True
                 if is_stair: uses_stair = True
                 
-                # If they step onto a transit node from a regular hallway, count it as a "Hop"!
                 if is_transit and not was_on_transit:
                     transit_hops += 1
                 was_on_transit = is_transit
             
             is_mixed = 1 if (uses_elev and uses_stair) else 0
-            weight = sum(safe_G[p[i]][p[i+1]]['weight'] for i in range(len(p)-1))
+            
+            # Use the SAFE graph to calculate the real metric distance for the UI
+            real_weight = sum(safe_G[p[i]][p[i+1]]['weight'] for i in range(len(p)-1))
             
             scored_paths.append({
                 'path': p,
                 'transit_hops': transit_hops,
                 'is_mixed': is_mixed,
-                'weight': weight
+                'weight': real_weight
             })
             
         if not scored_paths:
             return "No logical alternatives found.", []
             
-        # --- THE ULTIMATE GOLDEN SORT ---
-        # Priority 1: is_mixed (0 beats 1 -> Pure routes ALWAYS beat mixed routes)
-        # Priority 2: transit_hops (1 elevator door ALWAYS beats 2 elevator doors, even on the same floor)
-        # Priority 3: weight (Shortest walking distance wins ties)
+        # ---------------------------------------------------------
+        # 2. THE GOLDEN SORT
+        # ---------------------------------------------------------
         scored_paths.sort(key=lambda x: (x['is_mixed'], x['transit_hops'], x['weight']))
         
         # --- Anti-Clone Filter ---
@@ -411,7 +429,9 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 
         final_paths = logical_paths
 
-        # --- THE ITINERARY BUILDER ---
+        # ---------------------------------------------------------
+        # 3. THE ITINERARY BUILDER
+        # ---------------------------------------------------------
         output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
         
         for i, path in enumerate(final_paths, 1):
