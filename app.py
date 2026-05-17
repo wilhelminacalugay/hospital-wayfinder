@@ -32,7 +32,7 @@ DETECTION_Y_BOUNDS = {
 
 def get_floor_from_coords(x, y):
     for floor, (ymin, ymax) in DETECTION_Y_BOUNDS.items():
-        if (ymin - 3000) <= y <= (ymax + 3000):
+        if (ymin - 100) <= y <= (ymax + 100):
             return floor
     return "UG" # Failsafe
 
