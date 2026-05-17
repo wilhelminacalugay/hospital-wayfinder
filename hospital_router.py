@@ -21,6 +21,26 @@ ELEV_TIME_PER_FLOOR = 2.5
 PEAK_HOURS = [(8, 11), (16, 19)] 
 CONGESTION_PENALTY = 1.35 
 
+# ==========================================
+# FLOOR DETECTION MATH (BACKEND)
+# ==========================================
+DETECTION_Y_BOUNDS = {
+    "LG": [-170844.5250, -159463.4517],
+    "UG": [-157112.6036, -145093.5759],
+    "2F": [-141687.9535, -128588.0201],
+    "3F": [-123925.8665, -112552.7519],
+    "4F": [-110017.8566, -98644.7420],
+    "5F": [-98097.2445, -84121.1446],
+    "6F": [-80271.6670, -76308.3462],
+}
+
+def get_floor_from_y(y):
+    """Mathematically detects the floor using a tight 100-unit buffer."""
+    for floor, (ymin, ymax) in DETECTION_Y_BOUNDS.items():
+        if (ymin - 100) <= y <= (ymax + 100):
+            return floor
+    return "UG" # Failsafe
+
 def calculate_distance(p1, p2):
     return math.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)
 
