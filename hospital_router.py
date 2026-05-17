@@ -331,35 +331,40 @@ def find_optimized_paths(graph, destinations, start, end, role):
         return f"Access Denied: This route crosses through restricted areas for a {role}.", []
 
     try:
-        # 1. Generate 50 raw paths to give us plenty of options to sort through
+        # Generate 50 raw paths
         raw_paths = list(itertools.islice(nx.shortest_simple_paths(safe_G, s_node, e_node, weight='weight'), 50))
         
         scored_paths = []
         
-        for p in raw_paths:
-            # --- Anti-Bounce Filter ---
-            visited_floors = []
-            is_valid = True
-            for node in p:
-                floor = get_floor_from_y(node[1])
-                if not visited_floors or visited_floors[-1] != floor:
-                    if floor in visited_floors:
-                        is_valid = False 
-                        break
-                    visited_floors.append(floor)
-            
-            if not is_valid:
-                continue 
+        for idx, p in enumerate(raw_paths):
+            # ---------------------------------------------------------
+            # THE GOLDEN ROUTE EXEMPTION IS BACK!
+            # Only run the Anti-Bounce filter on Options 2 through 50.
+            # ---------------------------------------------------------
+            if idx > 0: 
+                visited_floors = []
+                is_valid = True
+                for node in p:
+                    floor = get_floor_from_y(node[1])
+                    if not visited_floors or visited_floors[-1] != floor:
+                        if floor in visited_floors:
+                            is_valid = False 
+                            break
+                        visited_floors.append(floor)
                 
+                if not is_valid:
+                    continue # Route bounced! Skip it.
+                    
             # --- THE STRUCTURAL MOVE ANALYZER ---
+            # (This part stays exactly the same, it scores Option 1 + all valid alternatives)
             moves = []
             for i in range(len(p)-1):
                 f1 = get_floor_from_y(p[i][1])
                 f2 = get_floor_from_y(p[i+1][1])
                 if f1 != f2:
-                    moves.append('V') # Vertical jump between floors
+                    moves.append('V')
                 else:
-                    moves.append('H') # Horizontal walk on the same floor
+                    moves.append('H')
                     
             # Compress consecutive moves (e.g., H, H, V, V, H becomes H, V, H)
             compressed = []
