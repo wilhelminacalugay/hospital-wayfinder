@@ -307,7 +307,7 @@ def get_restrictions(role):
     }
     return roles.get(role, common)
 
-# --- THE NEW SMART ITINERARY GENERATOR ---
+# --- THE FULLY ASSEMBLED SMART ITINERARY GENERATOR ---
 def find_optimized_paths(graph, destinations, start, end, role):
     if start not in destinations or end not in destinations:
         return "Start or Destination not found in database."
@@ -322,58 +322,22 @@ def find_optimized_paths(graph, destinations, start, end, role):
         return f"Path restricted for your role ({role})."
 
     try:
-        # 1. Generate up to 20 raw paths to find good alternatives without crashing
-        raw_paths = list(islice(nx.shortest_simple_paths(safe_G, s_node, e_node, weight='weight'), 20))
+        # 1. Generate up to 20 raw paths
+        raw_paths = list(itertools.islice(nx.shortest_simple_paths(safe_G, s_node, e_node, weight='weight'), 20))
         
         # 2. THE ANTI-BOUNCE FILTER
-        # This destroys any route that visits a floor, leaves, and comes back.
         logical_paths = []
         for p in raw_paths:
             visited_floors = []
             is_valid = True
             
-            # 4. BUILD THE RICH TURN-BY-TURN TEXT
-        output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
-        path_data = []
-        
-        for i, path in enumerate(final_paths, 1):
-            step_sequence = []
-            current_floor = get_floor_from_y(path[0][1])
-            step_sequence.append(f"Start at {start}")
-            
-            for j, node in enumerate(path):
-                node_floor = get_floor_from_y(node[1])
-                
-                # Grab the text label of the node (if it has one)
-                node_label = safe_G.nodes[node].get('label', '').upper()
-                
-                # Detect if we changed floors
-                if node_floor != current_floor:
-                    # Dynamically determine the transit method by reading the CAD labels
-                    transit_method = "Stairs/Elevator" # Failsafe
-                    
-                    if "ELEV" in node_label:
-                        transit_method = "Elevator"
-                    elif "STAIR" in node_label:
-                        transit_method = "Stairs"
-                    elif j > 0:
-                        # Sometimes the CAD label is attached to the previous node (just before the jump)
-                        prev_label = safe_G.nodes[path[j-1]].get('label', '').upper()
-                        if "ELEV" in prev_label:
-                            transit_method = "Elevator"
-                        elif "STAIR" in prev_label:
-                            transit_method = "Stairs"
-
-                    step_sequence.append(f"Take {transit_method} to {node_floor}")
-                    current_floor = node_floor
-                
-                # Detect if we are passing a labeled room along the way
-                if node_label and node_label not in [start, end]:
-                    # Skip printing the transit nodes again so we don't say "Pass by STAIR (UG)"
-                    if "STAIR" not in node_label and "ELEV" not in node_label:
-                        step_sequence.append(f"Pass by {node_label}")
-                            
-            step_sequence.append(f"Arrive at {end}")
+            for node in p:
+                floor = get_floor_from_y(node[1])
+                if not visited_floors or visited_floors[-1] != floor:
+                    if floor in visited_floors:
+                        is_valid = False # Bounce Detected! Kill this route.
+                        break
+                    visited_floors.append(floor)
                     
             if is_valid:
                 logical_paths.append(p)
@@ -393,25 +357,37 @@ def find_optimized_paths(graph, destinations, start, end, role):
             current_floor = get_floor_from_y(path[0][1])
             step_sequence.append(f"Start at {start}")
             
-            for node in path:
+            for j, node in enumerate(path):
                 node_floor = get_floor_from_y(node[1])
+                node_label = safe_G.nodes[node].get('label', '').upper()
                 
                 # Detect if we changed floors
                 if node_floor != current_floor:
-                    step_sequence.append(f"Take Stairs/Elevator to {node_floor}")
+                    transit_method = "Stairs/Elevator" # Failsafe
+                    
+                    # Smart Transit Detection
+                    if "ELEV" in node_label:
+                        transit_method = "Elevator"
+                    elif "STAIR" in node_label:
+                        transit_method = "Stairs"
+                    elif j > 0:
+                        prev_label = safe_G.nodes[path[j-1]].get('label', '').upper()
+                        if "ELEV" in prev_label:
+                            transit_method = "Elevator"
+                        elif "STAIR" in prev_label:
+                            transit_method = "Stairs"
+
+                    step_sequence.append(f"Take {transit_method} to {node_floor}")
                     current_floor = node_floor
                 
-                # Detect if we are passing a labeled room along the way
-                if 'label' in safe_G.nodes[node]:
-                    room_name = safe_G.nodes[node]['label']
-                    if room_name not in [start, end]:
-                        # Optional: Skip printing stairs/elevators in the "pass by" text
-                        if "STAIR" not in room_name and "ELEV" not in room_name:
-                            step_sequence.append(f"Pass by {room_name}")
+                # Detect if we are passing a labeled room
+                if node_label and node_label not in [start, end]:
+                    if "STAIR" not in node_label and "ELEV" not in node_label:
+                        step_sequence.append(f"Pass by {node_label}")
                             
             step_sequence.append(f"Arrive at {end}")
             
-            # Print the steps cleanly with arrows
+            # Compile the text for this specific option
             output += f"OPTION {i}:\n"
             output += " ➔ ".join(step_sequence) + "\n\n"
             
