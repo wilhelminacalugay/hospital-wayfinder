@@ -287,7 +287,7 @@ def get_restrictions(role):
     }
     return roles.get(role, common)
 
-# --- THE FIX: This function now officially accepts 5 arguments! ---
+# --- THE NEW SMART ITINERARY GENERATOR ---
 def find_optimized_paths(graph, destinations, start, end, role):
     if start not in destinations or end not in destinations:
         return "Start or Destination not found in database."
@@ -302,24 +302,78 @@ def find_optimized_paths(graph, destinations, start, end, role):
         return f"Path restricted for your role ({role})."
 
     try:
-        paths = list(islice(nx.shortest_simple_paths(safe_G, s_node, e_node, weight='weight'), 3))
+        # 1. Generate up to 20 raw paths to find good alternatives without crashing
+        raw_paths = list(islice(nx.shortest_simple_paths(safe_G, s_node, e_node, weight='weight'), 20))
         
-        output = f"[ SEQUENCE LIST FOR {role} ]\n\n"
-        path_data = []
-        for i, path in enumerate(paths, 1):
-            labels = [safe_G.nodes[p]['label'] for p in path if 'label' in safe_G.nodes[p]]
-            output += f"Option {i}: {' -> '.join(labels)}\n"
+        # 2. THE ANTI-BOUNCE FILTER
+        # This destroys any route that visits a floor, leaves, and comes back.
+        logical_paths = []
+        for p in raw_paths:
+            visited_floors = []
+            is_valid = True
             
+            for node in p:
+                # We use the Y-coordinate helper you added in the last step
+                floor = get_floor_from_y(node[1])
+                if not visited_floors or visited_floors[-1] != floor:
+                    if floor in visited_floors:
+                        is_valid = False # Bounce Detected! Kill this route.
+                        break
+                    visited_floors.append(floor)
+                    
+            if is_valid:
+                logical_paths.append(p)
+                
+        # 3. Keep only the Top 3 Logical Paths
+        final_paths = logical_paths[:3]
+        
+        if not final_paths:
+            return "No logical alternatives found. You are currently on the only viable path."
+
+        # 4. BUILD THE RICH TURN-BY-TURN TEXT
+        output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
+        path_data = []
+        
+        for i, path in enumerate(final_paths, 1):
+            step_sequence = []
+            current_floor = get_floor_from_y(path[0][1])
+            step_sequence.append(f"Start at {start}")
+            
+            for node in path:
+                node_floor = get_floor_from_y(node[1])
+                
+                # Detect if we changed floors
+                if node_floor != current_floor:
+                    step_sequence.append(f"Take Stairs/Elevator to {node_floor}")
+                    current_floor = node_floor
+                
+                # Detect if we are passing a labeled room along the way
+                if 'label' in safe_G.nodes[node]:
+                    room_name = safe_G.nodes[node]['label']
+                    if room_name not in [start, end]:
+                        # Optional: Skip printing stairs/elevators in the "pass by" text
+                        if "STAIR" not in room_name and "ELEV" not in room_name:
+                            step_sequence.append(f"Pass by {room_name}")
+                            
+            step_sequence.append(f"Arrive at {end}")
+            
+            # Print the steps cleanly with arrows
+            output += f"OPTION {i}:\n"
+            output += " ➔ ".join(step_sequence) + "\n\n"
+            
+            # Calculate metrics
             seconds = sum(safe_G[u][v]['weight'] for u, v in zip(path[:-1], path[1:]))
             turns = count_turns(path)
             path_data.append([i, format_time(seconds), turns])
 
-        output += f"\n{'='*45}\n"
+        # 5. PRINT THE METRICS TABLE
+        output += f"{'='*45}\n"
         output += f"{'OPT':<5} | {'TIME':<15} | {'TURNS':<10}\n"
         output += f"{'-'*45}\n"
         for d in path_data:
             output += f"{d[0]:<5} | {d[1]:<15} | {d[2]:<10}\n"
         output += f"{'='*45}\n"
+        
         return output
         
     except nx.NetworkXNoPath:
