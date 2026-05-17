@@ -78,86 +78,80 @@ if st.sidebar.button("Calculate Route"):
         st.warning("Start and Destination are the same!")
         st.session_state.route_active = False
     else:
-        s_node = destinations[start_room]
-        e_node = destinations[end_room]
+        # Catch BOTH the text and the list of paths from our backend
+        itinerary_text, all_paths = find_optimized_paths(
+            graph, destinations, start_room, end_room, selected_role
+        )
         
-        restricted_keywords = get_restrictions(selected_role)
-        restricted_nodes = [
-            n for n, d in graph.nodes(data=True) 
-            if any(k in d.get('label', '') for k in restricted_keywords)
-        ]
-        
-        safe_G = graph.copy()
-        safe_G.remove_nodes_from(restricted_nodes)
-        
-        if s_node not in safe_G or e_node not in safe_G:
-            st.error(f"Access Denied: This route is restricted for your role ({selected_role}).")
+        if not all_paths: # If it's empty, an error occurred
+            st.error(itinerary_text)
             st.session_state.route_active = False
         else:
-            try:
-                path = nx.shortest_path(safe_G, s_node, e_node, weight='weight')
-                
-                # Slicer Logic
-                segments = []
-                first_x, first_y = path[0][0], path[0][1]
-                current_floor = get_floor_from_coords(first_x, first_y)
-                current_x, current_y = [], []
-                
-                for p in path:
-                    node_x, node_y = p[0], p[1]
-                    node_floor = get_floor_from_coords(node_x, node_y)
-                    
-                    if node_floor == current_floor:
-                        current_x.append(node_x)
-                        current_y.append(node_y)
-                    else:
-                        segments.append({'floor': current_floor, 'x': current_x, 'y': current_y})
-                        current_floor = node_floor
-                        current_x, current_y = [node_x], [node_y]
-                
-                if len(current_x) > 0:
-                    segments.append({'floor': current_floor, 'x': current_x, 'y': current_y})
-                
-                st.session_state.route_segments = segments
-                st.session_state.route_active = True
-                st.session_state.itinerary_text = find_optimized_paths(
-                    graph, destinations, start_room, end_room, selected_role
-                )
-                
-            except nx.NetworkXNoPath:
-                st.error(f"No valid path found for {selected_role} between these locations.")
-                st.session_state.route_active = False
+            # Save the paths to the session state
+            st.session_state.all_paths = all_paths
+            st.session_state.itinerary_text = itinerary_text
+            st.session_state.route_active = True
 
 # ==========================================
 # VISUALIZATION & MULTI-FLOOR UI
 # ==========================================
 if st.session_state.route_active:
-    st.success("Route generated successfully!")
+    st.success("Routes generated successfully!")
     
-    segments = st.session_state.route_segments
+    # --- 1. THE NEW ROUTE SELECTOR DROPDOWN ---
+    path_options = [f"Option {i+1}" for i in range(len(st.session_state.all_paths))]
+    
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        selected_path_name = st.selectbox("🗺️ Select Route to Display on Map:", path_options)
+    
+    # Grab the specific math array for the chosen option
+    path_idx = path_options.index(selected_path_name)
+    active_path = st.session_state.all_paths[path_idx]
+    
+    # --- 2. DYNAMIC SLICER (Runs on the selected option) ---
+    segments = []
+    first_x, first_y = active_path[0][0], active_path[0][1]
+    current_floor = get_floor_from_coords(first_x, first_y)
+    current_x, current_y = [], []
+    
+    for p in active_path:
+        node_x, node_y = p[0], p[1]
+        node_floor = get_floor_from_coords(node_x, node_y)
+        
+        if node_floor == current_floor:
+            current_x.append(node_x)
+            current_y.append(node_y)
+        else:
+            segments.append({'floor': current_floor, 'x': current_x, 'y': current_y})
+            current_floor = node_floor
+            current_x, current_y = [node_x], [node_y]
+            
+    if len(current_x) > 0:
+        segments.append({'floor': current_floor, 'x': current_x, 'y': current_y})
+        
     valid_segments = [seg for seg in segments if seg['floor'] != "UNKNOWN"]
     segment_names = [f"Step {i+1}: {seg['floor']} Floor" for i, seg in enumerate(valid_segments)]
     
-    st.markdown("### 🗺️ Route Map")
+    st.markdown("---")
+    
+    # --- 3. FLOOR NAVIGATION UI ---
     if len(valid_segments) > 1:
         st.info("This route spans multiple floors. Follow the steps below sequentially.")
     
-    selected_segment_name = st.radio("Navigation Sequence:", segment_names, horizontal=True)
+    selected_segment_name = st.radio("Floor Navigation Sequence:", segment_names, horizontal=True)
     active_idx = segment_names.index(selected_segment_name)
     active_segment = valid_segments[active_idx]
     active_floor = active_segment['floor']
     
-    # --- PLOTLY MAP VISUALIZATION ---
+    # --- 4. PLOTLY MAP VISUALIZATION ---
     fig = go.Figure()
     
-    # 1. DRAW THE BLUEPRINT (BACKGROUND SKELETON)
-    # We iterate through the graph and draw all edges that belong to the active floor
+    # DRAW THE BLUEPRINT (BACKGROUND SKELETON)
     edge_x = []
     edge_y = []
-    
     for u, v in graph.edges():
         if get_floor_from_coords(u[0], u[1]) == active_floor and get_floor_from_coords(v[0], v[1]) == active_floor:
-            # We add None between line segments so Plotly doesn't connect them into a giant spiderweb
             edge_x.extend([u[0], v[0], None])
             edge_y.extend([u[1], v[1], None])
             
@@ -169,7 +163,7 @@ if st.session_state.route_active:
         name='Hospital Layout'
     ))
         
-    # 2. DRAW THE OPTIMAL ROUTE
+    # DRAW THE OPTIMAL ROUTE
     path_x = active_segment['x']
     path_y = active_segment['y']
     
@@ -181,7 +175,6 @@ if st.session_state.route_active:
             name=f'{active_floor} Route'
         ))
         
-        # Mark Local Start/End Points
         fig.add_trace(go.Scatter(
             x=[path_x[0], path_x[-1]], 
             y=[path_y[0], path_y[-1]],
@@ -193,8 +186,6 @@ if st.session_state.route_active:
             name='Anchor Points'
         ))
         
-    # 3. CONFIGURE PLOTLY (AUTO-SCALING)
-    # We lock the scaleanchor so the map doesn't warp, but let Plotly auto-zoom to the data
     fig.update_layout(
         xaxis=dict(showgrid=False, zeroline=False, visible=False),
         yaxis=dict(showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1),
@@ -204,8 +195,8 @@ if st.session_state.route_active:
         showlegend=False
     )
     
-    # We set a fixed height so the map looks good on screen
     st.plotly_chart(fig, use_container_width=True, height=600)
     
-    st.markdown("### 📋 Step-by-Step Itinerary")
+    # --- 5. PRINT TEXT ITINERARY ---
+    st.markdown("### 📋 Turn-by-Turn Itinerary")
     st.text(st.session_state.itinerary_text)
