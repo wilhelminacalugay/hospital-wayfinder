@@ -318,46 +318,44 @@ def get_restrictions(role):
 
 # --- THE FULLY ASSEMBLED SMART ITINERARY GENERATOR ---
 def find_optimized_paths(graph, destinations, start, end, role):
-    if start not in destinations or end not in destinations:
-        return "Start or Destination not found in database.", []
+    if start not in destinations or end not in destinations:
+        return "Start or Destination not found in database.", []
 
-    s_node, e_node = destinations[start], destinations[end]
-    restricted = [n for n, d in graph.nodes(data=True) if any(k in d.get('label','') for k in get_restrictions(role))]
-    
-    safe_G = graph.copy()
-    safe_G.remove_nodes_from(restricted)
-    
-    if s_node not in safe_G or e_node not in safe_G:
-        return f"Access Denied: This route crosses through restricted areas for a {role}.", []
+    s_node, e_node = destinations[start], destinations[end]
+    restricted = [n for n, d in graph.nodes(data=True) if any(k in d.get('label','') for k in get_restrictions(role))]
+    
+    safe_G = graph.copy()
+    safe_G.remove_nodes_from(restricted)
+    
+    if s_node not in safe_G or e_node not in safe_G:
+        return f"Access Denied: This route crosses through restricted areas for a {role}.", []
 
-    try:
-        try:
+    try:
         raw_paths = list(itertools.islice(nx.shortest_simple_paths(safe_G, s_node, e_node, weight='weight'), 20))
         
-        # ---------------------------------------------------------
-        # THE GOLDEN ROUTE EXEMPTION
-        # Always protect Option 1. If it "bounces", it's a CAD glitch, not a bad route.
-        # ---------------------------------------------------------
+        # 1. We start the list by automatically saving Option 1 (raw_paths[0])
         logical_paths = [raw_paths[0]] 
         
-        # Apply the Anti-Bounce Filter ONLY to the alternatives (Paths 2-20)
+        # 2. We add [1:] so the filter only tests Option 2 through 20
         for p in raw_paths[1:]:
             visited_floors = []
-            is_valid = True
-            for node in p:
-                floor = get_floor_from_y(node[1])
-                if not visited_floors or visited_floors[-1] != floor:
-                    if floor in visited_floors:
-                        is_valid = False # Real Bounce Detected! Kill this alternative.
-                        break
-                    visited_floors.append(floor)
-            if is_valid:
-                logical_paths.append(p)
-                
-        # Keep up to 3 paths
-        final_paths = logical_paths[:3]
+            is_valid = True
+            for node in p:
+                floor = get_floor_from_y(node[1])
+                if not visited_floors or visited_floors[-1] != floor:
+                    if floor in visited_floors:
+                        is_valid = False 
+                        break
+                    visited_floors.append(floor)
+            if is_valid:
+                logical_paths.append(p)
+                
+        final_paths = logical_paths[:3]
+        
+        if not final_paths:
+            return "No logical alternatives found.", []
 
-        output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
+        output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
         
         # ... (The rest of your step_sequence and output code remains exactly the same)
         
