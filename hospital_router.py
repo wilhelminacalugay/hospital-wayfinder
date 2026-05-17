@@ -297,16 +297,32 @@ def build_hospital_graph(dxf_file_path):
     return apply_congestion(G), destinations
 
 def get_restrictions(role):
-    # Base areas no regular person should enter
-    common = ["STAFF", "SERVICE", "CSSR", "CLEAN LINEN", "SOILED", "DIET KITCHEN", "MORGUE", "OPERATING AREA"]
-    roles = {
-        "DOCTOR": [], # Doctors go anywhere
-        "STAFF": ["DOCTOR'S LOUNGE"],
-        "PATIENT": common,
-        "VISITOR": common + ["ICU", "NICU", "ISOLATION"],
-        "PWD": common + ["ICU", "NICU", "ISOLATION", "STAIR"] # PWD avoids stairs
-    }
-    return roles.get(role, common)
+    """
+    Returns a list of text keywords that the selected role is FORBIDDEN from entering.
+    """
+    role = role.upper()
+    
+    # Common private areas that general public shouldn't wander into
+    private_medical_areas = ["OPERATING", "SURG", "LAB", "MORGUE", "STORAGE", "UTILITY"]
+    private_staff_areas = ["STAFF", "ADMIN", "SERVER", "IT", "DOCTOR", "NURSE"]
+    
+    # "SERVICE" covers Service Elevators and Service Hallways
+    general_public_restrictions = private_medical_areas + private_staff_areas + ["SERVICE"]
+
+    if role in ["PATIENT", "VISITOR"]:
+        return general_public_restrictions
+        
+    elif role == "PWD":
+        # PWD gets the same restrictions as public, PLUS we ban "STAIR" 
+        # to force the routing engine to exclusively find Elevator paths.
+        return general_public_restrictions + ["STAIR"]
+        
+    elif role in ["DOCTOR", "NURSE", "STAFF"]:
+        # Medical and hospital staff have full master access.
+        # They can use Service Elevators, Stairs, and enter private wings.
+        return [] 
+        
+    return []
 
 # --- THE FULLY ASSEMBLED SMART ITINERARY GENERATOR ---
 def find_optimized_paths(graph, destinations, start, end, role):
@@ -320,94 +336,87 @@ def find_optimized_paths(graph, destinations, start, end, role):
     safe_G.remove_nodes_from(restricted)
     
     if s_node not in safe_G or e_node not in safe_G:
-        return f"Path restricted for your role ({role}).", []
+        return f"Access Denied: This route crosses through restricted areas for a {role}.", []
 
     try:
-        # 1. Generate up to 20 raw paths
         raw_paths = list(itertools.islice(nx.shortest_simple_paths(safe_G, s_node, e_node, weight='weight'), 20))
         
-        # 2. THE ANTI-BOUNCE FILTER
         logical_paths = []
         for p in raw_paths:
             visited_floors = []
             is_valid = True
-            
             for node in p:
                 floor = get_floor_from_y(node[1])
                 if not visited_floors or visited_floors[-1] != floor:
                     if floor in visited_floors:
-                        is_valid = False # Bounce Detected! Kill this route.
+                        is_valid = False 
                         break
                     visited_floors.append(floor)
-                    
             if is_valid:
                 logical_paths.append(p)
                 
-        # 3. Keep only the Top 3 Logical Paths
         final_paths = logical_paths[:3]
         
         if not final_paths:
-            return "No logical alternatives found. You are currently on the only viable path."
+            return "No logical alternatives found.", []
 
-        # 4. BUILD THE RICH TURN-BY-TURN TEXT
         output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
-        path_data = []
         
         for i, path in enumerate(final_paths, 1):
             step_sequence = []
             current_floor = get_floor_from_y(path[0][1])
             step_sequence.append(f"Start at {start}")
             
+            # Tracking flags for the Route Tag
+            uses_stairs = False
+            uses_elev = False
+            
             for j, node in enumerate(path):
                 node_floor = get_floor_from_y(node[1])
                 node_label = safe_G.nodes[node].get('label', '').upper()
                 
-                # Detect if we changed floors
                 if node_floor != current_floor:
-                    transit_method = "Stairs/Elevator" # Failsafe
-                    
-                    # Smart Transit Detection
+                    transit_method = "Stairs/Elevator" 
                     if "ELEV" in node_label:
                         transit_method = "Elevator"
+                        uses_elev = True
                     elif "STAIR" in node_label:
                         transit_method = "Stairs"
+                        uses_stairs = True
                     elif j > 0:
                         prev_label = safe_G.nodes[path[j-1]].get('label', '').upper()
                         if "ELEV" in prev_label:
                             transit_method = "Elevator"
+                            uses_elev = True
                         elif "STAIR" in prev_label:
                             transit_method = "Stairs"
+                            uses_stairs = True
 
                     step_sequence.append(f"Take {transit_method} to {node_floor}")
                     current_floor = node_floor
                 
-                # Detect if we are passing a labeled room
                 if node_label and node_label not in [start, end]:
                     if "STAIR" not in node_label and "ELEV" not in node_label:
                         step_sequence.append(f"Pass by {node_label}")
                             
             step_sequence.append(f"Arrive at {end}")
             
-            # Compile the text for this specific option
-            output += f"OPTION {i}:\n"
+            # Create a clear tag for the user
+            if uses_stairs and uses_elev:
+                route_tag = "[Mixed: Stairs & Elevator]"
+            elif uses_stairs:
+                route_tag = "[Stairs Route]"
+            elif uses_elev:
+                route_tag = "[Elevator Route]"
+            else:
+                route_tag = "[Same Floor - Direct Walk]"
+            
+            output += f"OPTION {i} {route_tag}:\n"
             output += " ➔ ".join(step_sequence) + "\n\n"
             
-            # Calculate metrics
-            seconds = sum(safe_G[u][v]['weight'] for u, v in zip(path[:-1], path[1:]))
-            turns = count_turns(path)
-            path_data.append([i, format_time(seconds), turns])
-
-        # 5. PRINT THE METRICS TABLE
-        output += f"{'='*45}\n"
-        output += f"{'OPT':<5} | {'TIME':<15} | {'TURNS':<10}\n"
-        output += f"{'-'*45}\n"
-        for d in path_data:
-            output += f"{d[0]:<5} | {d[1]:<15} | {d[2]:<10}\n"
-        output += f"{'='*45}\n"
-        
         return output, final_paths
         
     except nx.NetworkXNoPath:
-        return f"[{role} ROUTE ERROR] No valid path found given your security clearance.", []
+        return f"[{role} ERROR] No valid path found. A required hallway, elevator, or room is restricted for your role.", []
 
 # We removed the terminal while loop at the bottom because Streamlit handles the interface now!
