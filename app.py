@@ -12,25 +12,15 @@ from hospital_router import build_hospital_graph, get_restrictions, find_optimiz
 st.set_page_config(page_title="Smart Hospital Wayfinder", layout="wide")
 st.title("🏥 Smart Hospital Wayfinding System")
 
-# Define the bounding boxes and image paths for all floors
+# Define the Master Bounds (Universal for all vertically stacked floors)
 # [WEST (Min X), EAST (Max X), SOUTH (Min Y), NORTH (Max Y)]
-# NOTE: Update the X coordinates below with your true side-by-side CAD data
-FLOOR_CONFIG = {
-    "LG": {"bounds": [300000.0, 417000.0, -157112.6, -145093.6], "img": "new block-LG_EXPORT.png"},
-    "UG": {"bounds": [417942.2, 532554.5, -157112.6, -145093.6], "img": "new block-UG_EXPORT.png"},
-    "2F": {"bounds": [540000.0, 650000.0, -157112.6, -145093.6], "img": "new block-2F_EXPORT.png"},
-    "3F": {"bounds": [660000.0, 770000.0, -157112.6, -145093.6], "img": "new block-3F_EXPORT.png"},
-    "4F": {"bounds": [780000.0, 890000.0, -157112.6, -145093.6], "img": "new block-4F_EXPORT.png"},
-    "5F": {"bounds": [900000.0, 1010000.0, -157112.6, -145093.6], "img": "new block-5F_EXPORT.png"},
-    "6F": {"bounds": [1020000.0, 1130000.0, -157112.6, -145093.6], "img": "new block-6F_EXPORT.png"},
-}
+MASTER_BOUNDS = [417942.2, 532554.5, -157112.6, -145093.6]
 
 # ==========================================
 # LOAD NETWORK ENGINE
 # ==========================================
 @st.cache_resource
 def load_network():
-    # Keep using your original top-to-bottom DXF file for this presentation
     graph, destinations = build_hospital_graph("new block.dxf") 
     return graph, destinations
 
@@ -41,6 +31,17 @@ if graph is None:
     st.stop()
 
 # ==========================================
+# STATE MANAGEMENT
+# ==========================================
+# Initialize session state variables to hold route data between UI clicks
+if 'route_active' not in st.session_state:
+    st.session_state.route_active = False
+if 'path_nodes' not in st.session_state:
+    st.session_state.path_nodes = []
+if 'floor_segments' not in st.session_state:
+    st.session_state.floor_segments = {}
+
+# ==========================================
 # USER INTERFACE (SIDEBAR)
 # ==========================================
 st.sidebar.header("Navigation Setup")
@@ -48,28 +49,17 @@ st.sidebar.header("Navigation Setup")
 roles = ["PATIENT", "VISITOR", "DOCTOR", "STAFF", "PWD"]
 selected_role = st.sidebar.selectbox("Select User Role", roles)
 
-# Sort destinations alphabetically for a clean UI
 room_names = sorted(list(destinations.keys()))
 start_room = st.sidebar.selectbox("Starting Point", room_names, index=0)
 end_room = st.sidebar.selectbox("Destination", room_names, index=1)
 
 # ==========================================
-# ROUTING & VISUALIZATION LOGIC
+# ROUTING CALCULATIONS
 # ==========================================
-def get_floors_in_path(path_nodes):
-    """Determines which floors a given path traverses based on X coordinates."""
-    active_floors = []
-    for node in path_nodes:
-        x_coord = node[0]
-        for floor, data in FLOOR_CONFIG.items():
-            dx_min, dx_max, _, _ = data["bounds"]
-            if dx_min <= x_coord <= dx_max and floor not in active_floors:
-                active_floors.append(floor)
-    return active_floors
-
 if st.sidebar.button("Calculate Route"):
     if start_room == end_room:
         st.warning("Start and Destination are the same!")
+        st.session_state.route_active = False
     else:
         s_node = destinations[start_room]
         e_node = destinations[end_room]
@@ -87,121 +77,132 @@ if st.sidebar.button("Calculate Route"):
         # 2. Check if route is possible
         if s_node not in safe_G or e_node not in safe_G:
             st.error(f"Access Denied: This route is restricted for your role ({selected_role}).")
+            st.session_state.route_active = False
         else:
             try:
                 # 3. Calculate mathematical path
                 path = nx.shortest_path(safe_G, s_node, e_node, weight='weight')
                 
-                # --- MULTI-FLOOR PLOTLY VISUALIZATION ---
-                
-                # Determine which floors this specific route uses
-                route_floors = get_floors_in_path(path)
-                
-                if not route_floors:
-                    st.error("Route coordinates do not match any known floor bounds.")
-                    st.stop()
-
-                # Initialize Session State for interactive floor navigation
-                if 'current_floor_idx' not in st.session_state:
-                    st.session_state.current_floor_idx = 0
-                
-                # Keep index within bounds if a new route is calculated
-                if st.session_state.current_floor_idx >= len(route_floors):
-                    st.session_state.current_floor_idx = 0
-
-                active_floor_name = route_floors[st.session_state.current_floor_idx]
-                floor_data = FLOOR_CONFIG[active_floor_name]
-                dx_min, dx_max, dy_min, dy_max = floor_data["bounds"]
-                
-                # UI: Floor Navigation Controls
-                st.markdown(f"### Current View: {active_floor_name} Floor")
-                col1, col2, col3 = st.columns([1, 2, 1])
-                
-                with col1:
-                    if st.session_state.current_floor_idx > 0:
-                        if st.button("⬅️ Previous Floor"):
-                            st.session_state.current_floor_idx -= 1
-                            st.rerun()
-                with col3:
-                    if st.session_state.current_floor_idx < len(route_floors) - 1:
-                        if st.button("Next Floor ➡️"):
-                            st.session_state.current_floor_idx += 1
-                            st.rerun()
-
-                # Build the Plotly Figure
-                fig = go.Figure()
-                img_path = floor_data["img"]
-                
-                try:
-                    img = Image.open(img_path)
-                    img_w, img_h = img.size  
-                    img_ratio = img_w / img_h
-                    
-                    cad_w = dx_max - dx_min
-                    cad_h = dy_max - dy_min
-                    true_image_height = cad_w / img_ratio
-                    
-                    y_center = dy_min + (cad_h / 2.0)
-                    y_adjusted_max = y_center + (true_image_height / 2.0)
-                    
-                    fig.add_layout_image(
-                        dict(
-                            source=img, xref="x", yref="y",
-                            x=dx_min, y=y_adjusted_max,
-                            sizex=cad_w, sizey=true_image_height,
-                            sizing="stretch", opacity=0.9, layer="below"
-                        )
-                    )
-                except FileNotFoundError:
-                    st.warning(f"Map image {img_path} not found. Drawing route on blank grid.")
-                
-                # The Spatial Slicer: Filter coordinates to strictly this floor
-                path_x, path_y = [], []
+                # 4. The Z-Axis Spatial Slicer
+                floor_segments = {}
                 for p in path:
-                    # If the node is within the current floor's horizontal bounds, draw it
-                    if dx_min - 500 <= p[0] <= dx_max + 500:
-                        path_x.append(p[0])
-                        path_y.append(p[1])
-                    else:
-                        # If we hit a node outside the floor (e.g., up an elevator),
-                        # insert a break (None) so Plotly doesn't draw a spaghetti line
-                        if path_x and path_x[-1] is not None:
-                            path_x.append(None)
-                            path_y.append(None)
+                    # Extract node data. Change 'layer' to whatever attribute 
+                    # hospital_router.py uses to store the floor name (e.g., 'floor', 'elevation')
+                    node_data = safe_G.nodes[p]
+                    floor_id = node_data.get('layer', 'UG') # Default to UG if missing
+                    
+                    if floor_id not in floor_segments:
+                        floor_segments[floor_id] = {'x': [], 'y': []}
                         
-                # Draw the Red Route Line
-                if any(x is not None for x in path_x):
-                    fig.add_trace(go.Scatter(
-                        x=path_x, y=path_y,
-                        mode='lines',
-                        line=dict(color='red', width=4),
-                        name='Optimal Route',
-                        connectgaps=False # Ensure the spatial slicer gaps are respected
-                    ))
+                    # Assuming nodes are represented as (X, Y) or (X, Y, Z) tuples
+                    floor_segments[floor_id]['x'].append(p[0])
+                    floor_segments[floor_id]['y'].append(p[1])
                 
-                # Clean up Axes
-                fig.update_layout(
-                    xaxis=dict(range=[dx_min, dx_max], showgrid=False, zeroline=False, visible=False),
-                    yaxis=dict(range=[dy_min, dy_max], showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1),
-                    margin=dict(l=0, r=0, t=0, b=0),
-                    plot_bgcolor="rgba(0,0,0,0)"
+                # Save to state so the UI can page through it
+                st.session_state.path_nodes = path
+                st.session_state.floor_segments = floor_segments
+                st.session_state.route_active = True
+                
+                # Also generate and store the text itinerary
+                st.session_state.itinerary_text = find_optimized_paths(
+                    graph, destinations, start_room, end_room, selected_role
                 )
-                
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Display Success
-                st.success("Route generated successfully!")
-                
-                # ==========================================
-                # ADD THE TEXT ITINERARY & OPTIONS HERE!
-                # ==========================================
-                st.markdown("### 📋 Step-by-Step Itinerary & Options")
-                
-                # Call your backend Operations Research function to get the text table
-                itinerary_text = find_optimized_paths(graph, destinations, start_room, end_room, selected_role)
-                
-                # Print it using st.text() so it keeps your perfect column spacing!
-                st.text(itinerary_text)
                 
             except nx.NetworkXNoPath:
                 st.error(f"No valid path found for {selected_role} between these locations.")
+                st.session_state.route_active = False
+
+# ==========================================
+# VISUALIZATION & MULTI-FLOOR UI
+# ==========================================
+if st.session_state.route_active:
+    st.success("Route generated successfully!")
+    
+    # Extract the sliced data from session state
+    floor_segments = st.session_state.floor_segments
+    involved_floors = list(floor_segments.keys())
+    
+    # Multi-Floor UI Selector
+    st.markdown("### 🗺️ Route Map")
+    if len(involved_floors) > 1:
+        st.info("This route spans multiple floors. Select a floor below to view that segment.")
+    
+    # This radio button lets the user "flip" through the floors.
+    # Because we used st.session_state, clicking this won't erase the calculated route.
+    selected_floor = st.radio("View Route on Floor:", involved_floors, horizontal=True)
+    
+    # --- PLOTLY MAP VISUALIZATION ---
+    dx_min, dx_max, dy_min, dy_max = MASTER_BOUNDS
+    fig = go.Figure()
+    
+    # Dynamically load the correct Background Image based on the selected floor
+    # Adjust this string formatting to match your exact PNG naming convention
+    img_path = f"new block-{selected_floor}_EXPORT.png" 
+    
+    try:
+        img = Image.open(img_path)
+        
+        # The "Anti-Pancake" Aspect Ratio Math
+        img_w, img_h = img.size  
+        img_ratio = img_w / img_h
+        
+        cad_w = dx_max - dx_min
+        cad_h = dy_max - dy_min
+        true_image_height = cad_w / img_ratio
+        
+        y_center = dy_min + (cad_h / 2.0)
+        y_adjusted_max = y_center + (true_image_height / 2.0)
+        
+        fig.add_layout_image(
+            dict(
+                source=img,
+                xref="x", yref="y",
+                x=dx_min, y=y_adjusted_max,
+                sizex=cad_w,
+                sizey=true_image_height,
+                sizing="stretch", 
+                opacity=0.9,
+                layer="below"
+            )
+        )
+    except FileNotFoundError:
+        st.warning(f"Could not find {img_path}. Displaying route without background.")
+        
+    # Draw ONLY the path segment that physically belongs to the currently selected floor
+    path_x = floor_segments[selected_floor]['x']
+    path_y = floor_segments[selected_floor]['y']
+    
+    if len(path_x) > 0:
+        fig.add_trace(go.Scatter(
+            x=path_x, y=path_y,
+            mode='lines',
+            line=dict(color='red', width=4),
+            name=f'{selected_floor} Route'
+        ))
+        
+        # Mark Local Start/End Points for this specific floor segment
+        fig.add_trace(go.Scatter(
+            x=[path_x[0], path_x[-1]], 
+            y=[path_y[0], path_y[-1]],
+            mode='markers+text',
+            marker=dict(color=['green', 'blue'], size=12),
+            text=['Segment Start', 'Segment End'],
+            textposition="top center",
+            name='Transition Points'
+        ))
+        
+    # Configure Plot axes to match the universal bounding box
+    fig.update_layout(
+        xaxis=dict(range=[dx_min, dx_max], showgrid=False, zeroline=False, visible=False),
+        yaxis=dict(range=[dy_min, dy_max], showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1),
+        margin=dict(l=0, r=0, t=0, b=0),
+        plot_bgcolor="rgba(0,0,0,0)"
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # ==========================================
+    # TEXT ITINERARY
+    # ==========================================
+    st.markdown("### 📋 Step-by-Step Itinerary & Options")
+    st.text(st.session_state.itinerary_text)
