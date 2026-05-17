@@ -372,13 +372,18 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 label = safe_G.nodes[node].get('label', '').upper()
                 is_transit = "ELEV" in label or "STAIR" in label
                 
-                # If they step onto a transit node from a hallway, count it as a boarding
                 if is_transit and not was_on_transit:
                     boardings += 1
                 was_on_transit = is_transit
                 
-            if boardings > 1:
-                continue # Destroy the route! They shouldn't have to transfer.
+                # THE FIX: If they board a second time, flag the route as dead and break!
+                if boardings > 1:
+                    is_valid = False 
+                    break 
+                    
+            # NOW we tell the outer loop to throw the entire route in the trash
+            if not is_valid:
+                continue
 
             # --- Check C: Anti-Clone (No identical routes using different lobby doors) ---
             is_clone = False
