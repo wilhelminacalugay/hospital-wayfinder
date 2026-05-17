@@ -351,33 +351,32 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 if not is_valid:
                     continue 
                     
-            # --- Structural Move Analyzer ---
-            moves = []
-            for i in range(len(p)-1):
-                f1 = get_floor_from_y(p[i][1])
-                f2 = get_floor_from_y(p[i+1][1])
-                if f1 != f2:
-                    moves.append('V')
-                else:
-                    moves.append('H')
-                    
-            compressed = []
-            for m in moves:
-                if not compressed or compressed[-1] != m:
-                    compressed.append(m)
-            v_count = compressed.count('V')
+            # --- THE NEW TRANSIT HOP ANALYZER ---
+            transit_hops = 0
+            was_on_transit = False
+            uses_elev = False
+            uses_stair = False
             
-            weight = sum(safe_G[p[i]][p[i+1]]['weight'] for i in range(len(p)-1))
+            for node in p:
+                label = safe_G.nodes[node].get('label', '').upper()
+                is_elev = "ELEV" in label
+                is_stair = "STAIR" in label
+                is_transit = is_elev or is_stair
+                
+                if is_elev: uses_elev = True
+                if is_stair: uses_stair = True
+                
+                # If they step onto a transit node from a regular hallway, count it as a "Hop"!
+                if is_transit and not was_on_transit:
+                    transit_hops += 1
+                was_on_transit = is_transit
             
-            # --- THE PURE TRANSIT DETECTOR ---
-            # Detects if a route forces a human to mix elevators and stairs
-            uses_elev = any("ELEV" in safe_G.nodes[n].get('label', '').upper() for n in p)
-            uses_stair = any("STAIR" in safe_G.nodes[n].get('label', '').upper() for n in p)
             is_mixed = 1 if (uses_elev and uses_stair) else 0
+            weight = sum(safe_G[p[i]][p[i+1]]['weight'] for i in range(len(p)-1))
             
             scored_paths.append({
                 'path': p,
-                'v_count': v_count,
+                'transit_hops': transit_hops,
                 'is_mixed': is_mixed,
                 'weight': weight
             })
@@ -385,11 +384,11 @@ def find_optimized_paths(graph, destinations, start, end, role):
         if not scored_paths:
             return "No logical alternatives found.", []
             
-        # --- THE NEW GOLDEN SORT ---
+        # --- THE ULTIMATE GOLDEN SORT ---
         # Priority 1: is_mixed (0 beats 1 -> Pure routes ALWAYS beat mixed routes)
-        # Priority 2: v_count (1 ride ALWAYS beats 2 rides)
+        # Priority 2: transit_hops (1 elevator door ALWAYS beats 2 elevator doors, even on the same floor)
         # Priority 3: weight (Shortest walking distance wins ties)
-        scored_paths.sort(key=lambda x: (x['is_mixed'], x['v_count'], x['weight']))
+        scored_paths.sort(key=lambda x: (x['is_mixed'], x['transit_hops'], x['weight']))
         
         # --- Anti-Clone Filter ---
         logical_paths = []
