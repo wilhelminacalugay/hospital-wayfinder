@@ -232,3 +232,8 @@ if st.session_state.route_active:
 debug_layers = [safe_G.nodes[p].get('layer', 'MISSING_LAYER') for p in path]
 st.warning(f"🕵️ Debugger - The nodes in this path belong to these layers: {set(debug_layers)}")
 # --------------------------------------------------
+# COMMENT THIS OUT TEMPORARILY
+# @st.cache_resource 
+def load_network():
+    graph, destinations = build_hospital_graph("new block.dxf") 
+    return graph, destinations
