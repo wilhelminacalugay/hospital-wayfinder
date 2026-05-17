@@ -311,7 +311,7 @@ def get_restrictions(role):
 # --- THE FULLY ASSEMBLED SMART ITINERARY GENERATOR ---
 def find_optimized_paths(graph, destinations, start, end, role):
     if start not in destinations or end not in destinations:
-        return "Start or Destination not found in database."
+        return "Start or Destination not found in database.", []
 
     s_node, e_node = destinations[start], destinations[end]
     restricted = [n for n, d in graph.nodes(data=True) if any(k in d.get('label','') for k in get_restrictions(role))]
@@ -320,7 +320,7 @@ def find_optimized_paths(graph, destinations, start, end, role):
     safe_G.remove_nodes_from(restricted)
     
     if s_node not in safe_G or e_node not in safe_G:
-        return f"Path restricted for your role ({role})."
+        return f"Path restricted for your role ({role}).", []
 
     try:
         # 1. Generate up to 20 raw paths
@@ -405,9 +405,9 @@ def find_optimized_paths(graph, destinations, start, end, role):
             output += f"{d[0]:<5} | {d[1]:<15} | {d[2]:<10}\n"
         output += f"{'='*45}\n"
         
-        return output
+        return output, final_paths
         
     except nx.NetworkXNoPath:
-        return f"[{role} ROUTE ERROR] No valid path found given your security clearance."
+        return f"[{role} ROUTE ERROR] No valid path found given your security clearance.", []
 
 # We removed the terminal while loop at the bottom because Streamlit handles the interface now!
