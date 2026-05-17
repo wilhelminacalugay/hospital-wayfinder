@@ -13,7 +13,28 @@ from hospital_router import build_hospital_graph, get_restrictions, find_optimiz
 st.set_page_config(page_title="Smart Hospital Wayfinder", layout="wide")
 st.title("🏥 Smart Hospital Wayfinding System")
 
-MASTER_BOUNDS = [417942.2, 532554.5, -157112.6, -145093.6]
+# ---------------------------------------------------------
+# THE BOUNDING BOX DICTIONARY (ASPECT-RATIO CORRECTED)
+# Format: [WEST (Min X), EAST (Max X), SOUTH (Min Y), NORTH (Max Y)]
+# All heights are locked to exactly 12019.0277 units to match the 5120x2880 PNGs.
+# ---------------------------------------------------------
+FLOOR_BOUNDS = {
+    "LG": [417942.2448, 532554.4766, -170844.5250, -158825.4973],
+    "UG": [417942.2448, 532554.4766, -157112.6036, -145093.5759],
+    "2F": [417942.2448, 532554.4766, -141687.9535, -129668.9258],
+    "3F": [417942.2448, 532554.4766, -123925.8665, -111906.8388],
+    "4F": [417942.2448, 532554.4766, -110017.8566,  -97998.8289],
+    "5F": [417942.2448, 532554.4766,  -98097.2445,  -86078.2168],
+    "6F": [417942.2448, 532554.4766,  -80271.6670,  -68252.6393],
+}
+
+def get_floor_from_coords(x, y):
+    """Helper function to mathematically detect which floor a node belongs to."""
+    # We add a 500-unit buffer just in case a node is slightly over the line
+    for floor, (xmin, xmax, ymin, ymax) in FLOOR_BOUNDS.items():
+        if (xmin - 500) <= x <= (xmax + 500) and (ymin - 500) <= y <= (ymax + 500):
+            return floor
+    return "UNKNOWN"
 
 @st.cache_resource
 def load_network():
