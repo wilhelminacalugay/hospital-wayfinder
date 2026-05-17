@@ -20,7 +20,20 @@ ELEV_DOOR_CYCLE = 12.0
 ELEV_TIME_PER_FLOOR = 2.5 
 
 PEAK_HOURS = [(8, 11), (16, 19)] 
-CONGESTION_PENALTY = 1.35 
+CONGESTION_PENALTY = 1.35
+
+# ==========================================
+# FLOOR ELEVATION MAP
+# ==========================================
+FLOOR_ELEVATION = {
+    "LG": 0,
+    "UG": 1,
+    "2F": 2,
+    "3F": 3,
+    "4F": 4,
+    "5F": 5,
+    "6F": 6
+}
 
 # ==========================================
 # FLOOR DETECTION MATH (BACKEND)
@@ -330,11 +343,7 @@ def find_optimized_paths(graph, destinations, start, end, role):
     if s_node not in safe_G or e_node not in safe_G:
         return f"Access Denied: This route crosses through restricted areas for a {role}.", []
 
-    # ---------------------------------------------------------
-    # 1. THE BOARDING PENALTY (The Graph Poison)
-    # We heavily penalize entering/exiting transit so Yen's algorithm 
-    # is forced to physically hunt down 1-ride routes.
-    # ---------------------------------------------------------
+    # 1. POISON THE GRAPH (Penalize Transit Boarding)
     routing_G = safe_G.copy()
     for u, v, d in routing_G.edges(data=True):
         u_label = routing_G.nodes[u].get('label', '').upper()
@@ -343,34 +352,48 @@ def find_optimized_paths(graph, destinations, start, end, role):
         u_is_transit = "ELEV" in u_label or "STAIR" in u_label
         v_is_transit = "ELEV" in v_label or "STAIR" in v_label
         
-        # If one node is a hallway and the next is transit, add 50,000 distance
         if u_is_transit != v_is_transit:
             d['weight'] += 50000 
 
     try:
-        # Generate paths using the POISONED graph (routing_G)
         raw_paths = list(itertools.islice(nx.shortest_simple_paths(routing_G, s_node, e_node, weight='weight'), 50))
         
         scored_paths = []
         
-        for idx, p in enumerate(raw_paths):
-            
+        for p in raw_paths:
             # ---------------------------------------------------------
-            # THE ANTI-BOUNCE FILTER (NO EXEMPTIONS!)
-            # Every single path, including Option 1, must pass this test.
+            # THE STRICT UNIDIRECTIONAL FILTER
             # ---------------------------------------------------------
             visited_floors = []
-            is_valid = True
             for node in p:
                 floor = get_floor_from_y(node[1])
                 if not visited_floors or visited_floors[-1] != floor:
-                    if floor in visited_floors:
-                        is_valid = False 
-                        break
                     visited_floors.append(floor)
             
+            is_valid = True
+            
+            # Rule 1: No U-Turns (No duplicate floors allowed)
+            if len(visited_floors) != len(set(visited_floors)):
+                is_valid = False
+                
+            # Rule 2: No V-Shapes (Strictly one-way vertical travel)
+            if is_valid and len(visited_floors) > 2:
+                elevations = [FLOOR_ELEVATION.get(f, -1) for f in visited_floors]
+                direction = None
+                
+                for k in range(len(elevations) - 1):
+                    diff = elevations[k+1] - elevations[k]
+                    if diff == 0: continue
+                    current_dir = "UP" if diff > 0 else "DOWN"
+                    
+                    if direction is None:
+                        direction = current_dir
+                    elif direction != current_dir:
+                        is_valid = False # They changed directions! Kill the route.
+                        break
+            
             if not is_valid:
-                continue # Route bounced! Destroy it immediately.
+                continue 
                     
             # --- THE TRANSIT HOP ANALYZER ---
             transit_hops = 0
@@ -392,8 +415,6 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 was_on_transit = is_transit
             
             is_mixed = 1 if (uses_elev and uses_stair) else 0
-            
-            # Use the SAFE graph to calculate the real metric distance for the UI
             real_weight = sum(safe_G[p[i]][p[i+1]]['weight'] for i in range(len(p)-1))
             
             scored_paths.append({
@@ -406,12 +427,10 @@ def find_optimized_paths(graph, destinations, start, end, role):
         if not scored_paths:
             return "No logical alternatives found.", []
             
-        # ---------------------------------------------------------
         # 2. THE GOLDEN SORT
-        # ---------------------------------------------------------
         scored_paths.sort(key=lambda x: (x['is_mixed'], x['transit_hops'], x['weight']))
         
-        # --- Anti-Clone Filter ---
+        # 3. ANTI-CLONE FILTER
         logical_paths = []
         for sp in scored_paths:
             p = sp['path']
@@ -432,9 +451,7 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 
         final_paths = logical_paths
 
-        # ---------------------------------------------------------
-        # 3. THE ITINERARY BUILDER
-        # ---------------------------------------------------------
+        # 4. ITINERARY BUILDER
         output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
         
         for i, path in enumerate(final_paths, 1):
