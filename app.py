@@ -163,7 +163,7 @@ if st.session_state.route_active:
     active_floor = active_segment['floor']
     
     # --- PLOTLY MAP VISUALIZATION ---
-    dx_min, dx_max, dy_min, dy_max = MASTER_BOUNDS
+    dx_min, dx_max, dy_min, dy_max = FLOOR_BOUNDS
     fig = go.Figure()
     
    # ---------------------------------------------------------
