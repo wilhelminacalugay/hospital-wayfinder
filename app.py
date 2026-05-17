@@ -1,10 +1,13 @@
 import streamlit as st
 import networkx as nx
 import plotly.graph_objects as go
-import os
-from PIL import Image
-import base64
 
+# ---------------------------------------------------------
+# THE GITHUB IMPORT FIX
+# ---------------------------------------------------------
+import importlib
+import hospital_router
+importlib.reload(hospital_router)
 from hospital_router import build_hospital_graph, get_restrictions, find_optimized_paths
 
 # ==========================================
@@ -14,20 +17,8 @@ st.set_page_config(page_title="Smart Hospital Wayfinder", layout="wide")
 st.title("🏥 Smart Hospital Wayfinding System")
 
 # ---------------------------------------------------------
-# 1. DISPLAY BOUNDS (STRICT 12,019 HEIGHT FOR PLOTLY IMAGES)
-# ---------------------------------------------------------
-FLOOR_BOUNDS = {
-    "LG": [417942.2448, 532554.4766, -170844.5250, -158825.4973],
-    "UG": [417942.2448, 532554.4766, -157112.6036, -145093.5759],
-    "2F": [417942.2448, 532554.4766, -141687.9535, -129668.9258],
-    "3F": [417942.2448, 532554.4766, -123925.8665, -111906.8388],
-    "4F": [417942.2448, 532554.4766, -110017.8566,  -97998.8289],
-    "5F": [417942.2448, 532554.4766,  -98097.2445,  -86078.2168],
-    "6F": [417942.2448, 532554.4766,  -80271.6670,  -68252.6393],
-}
-
-# ---------------------------------------------------------
-# 2. DETECTION BOUNDS (RAW CAD LIMITS FOR THE SLICER)
+# DETECTION BOUNDS (RAW CAD LIMITS FOR THE SLICER)
+# We ONLY need these now to slice the multi-floor route!
 # ---------------------------------------------------------
 DETECTION_Y_BOUNDS = {
     "LG": [-170844.5250, -159463.4517],
@@ -40,17 +31,14 @@ DETECTION_Y_BOUNDS = {
 }
 
 def get_floor_from_coords(x, y):
-    """Mathematically detects the floor using a massive vertical buffer."""
-    # We apply a massive 3000-unit safety buffer to your raw coordinates 
-    # to guarantee absolutely no routing nodes ever get left behind.
     for floor, (ymin, ymax) in DETECTION_Y_BOUNDS.items():
         if (ymin - 3000) <= y <= (ymax + 3000):
             return floor
-            
-    # Absolute failsafe: If a coordinate is completely lost in the void, 
-    # default to UG instead of crashing the application.
-    return "UG"
+    return "UG" # Failsafe
 
+# ==========================================
+# LOAD NETWORK ENGINE
+# ==========================================
 @st.cache_resource
 def load_network():
     graph, destinations = build_hospital_graph("new block.dxf") 
@@ -109,50 +97,27 @@ if st.sidebar.button("Calculate Route"):
             try:
                 path = nx.shortest_path(safe_G, s_node, e_node, weight='weight')
                 
-                # ---------------------------------------------------------
-                # THE COORDINATE-BASED SLICER (NO CAD LAYERS!)
-                # This mathematically scans the Y-axis to figure out the floor.
-                # ---------------------------------------------------------
+                # Slicer Logic
                 segments = []
-                
-                # Grab the X and Y coordinates of the very first step
-                first_x = path[0][0]
-                first_y = path[0][1]
-                
-                # Use our new math function instead of .get('layer')
+                first_x, first_y = path[0][0], path[0][1]
                 current_floor = get_floor_from_coords(first_x, first_y)
-                current_x = []
-                current_y = []
+                current_x, current_y = [], []
                 
                 for p in path:
-                    node_x = p[0]
-                    node_y = p[1]
+                    node_x, node_y = p[0], p[1]
                     node_floor = get_floor_from_coords(node_x, node_y)
                     
                     if node_floor == current_floor:
                         current_x.append(node_x)
                         current_y.append(node_y)
                     else:
-                        # We detected a massive jump on the Y-axis (Elevator)
-                        segments.append({
-                            'floor': current_floor,
-                            'x': current_x,
-                            'y': current_y
-                        })
-                        # Start tracking the new floor
+                        segments.append({'floor': current_floor, 'x': current_x, 'y': current_y})
                         current_floor = node_floor
-                        current_x = [node_x]
-                        current_y = [node_y]
+                        current_x, current_y = [node_x], [node_y]
                 
-                # Catch the final segment
                 if len(current_x) > 0:
-                    segments.append({
-                        'floor': current_floor,
-                        'x': current_x,
-                        'y': current_y
-                    })
+                    segments.append({'floor': current_floor, 'x': current_x, 'y': current_y})
                 
-                # Save to session state
                 st.session_state.route_segments = segments
                 st.session_state.route_active = True
                 st.session_state.itinerary_text = find_optimized_paths(
@@ -170,73 +135,41 @@ if st.session_state.route_active:
     st.success("Route generated successfully!")
     
     segments = st.session_state.route_segments
-    
-    # Create sequential UI buttons (e.g., "Step 1: UG", "Step 2: F1")
-    segment_names = [f"Step {i+1}: {seg['floor']} Floor" for i, seg in enumerate(segments)]
+    valid_segments = [seg for seg in segments if seg['floor'] != "UNKNOWN"]
+    segment_names = [f"Step {i+1}: {seg['floor']} Floor" for i, seg in enumerate(valid_segments)]
     
     st.markdown("### 🗺️ Route Map")
-    if len(segments) > 1:
+    if len(valid_segments) > 1:
         st.info("This route spans multiple floors. Follow the steps below sequentially.")
     
-    # The Sequence Flipbook
     selected_segment_name = st.radio("Navigation Sequence:", segment_names, horizontal=True)
-    
-    # Get the active segment data based on user selection
     active_idx = segment_names.index(selected_segment_name)
-    active_segment = segments[active_idx]
+    active_segment = valid_segments[active_idx]
     active_floor = active_segment['floor']
     
     # --- PLOTLY MAP VISUALIZATION ---
-    # --- PLOTLY MAP VISUALIZATION ---
-    # We dynamically grab the specific bounding box for the active floor!
-    # Safely fetch the bounds. If the memory is corrupted or unknown, default to UG.
-    bounds = FLOOR_BOUNDS.get(active_floor, FLOOR_BOUNDS["UG"])
-    dx_min, dx_max, dy_min, dy_max = bounds
     fig = go.Figure()
     
-   # ---------------------------------------------------------
-    # IMAGE DEBUGGER & LOADER (Base64 Web-Safe Version)
-    # ---------------------------------------------------------
-    img_path = f"new block-{active_floor}_EXPORT.png" 
+    # 1. DRAW THE BLUEPRINT (BACKGROUND SKELETON)
+    # We iterate through the graph and draw all edges that belong to the active floor
+    edge_x = []
+    edge_y = []
     
-    if os.path.exists(img_path):
-        # 1. Open with PIL just to get the width/height math
-        img = Image.open(img_path)
-        img_w, img_h = img.size  
-        img_ratio = img_w / img_h
+    for u, v in graph.edges():
+        if get_floor_from_coords(u[0], u[1]) == active_floor and get_floor_from_coords(v[0], v[1]) == active_floor:
+            # We add None between line segments so Plotly doesn't connect them into a giant spiderweb
+            edge_x.extend([u[0], v[0], None])
+            edge_y.extend([u[1], v[1], None])
+            
+    fig.add_trace(go.Scatter(
+        x=edge_x, y=edge_y,
+        mode='lines',
+        line=dict(color='lightgray', width=2),
+        hoverinfo='none',
+        name='Hospital Layout'
+    ))
         
-        # 2. Encode the image to Base64 so Plotly guarantees rendering in the browser
-        with open(img_path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode()
-        img_uri = f"data:image/png;base64,{encoded_string}"
-        
-        # 3. "Anti-Pancake" Bounding Box Math
-        cad_w = dx_max - dx_min
-        cad_h = dy_max - dy_min
-        true_image_height = cad_w / img_ratio
-        
-        y_center = dy_min + (cad_h / 2.0)
-        y_adjusted_max = y_center + (true_image_height / 2.0)
-        
-        # 4. Inject the Base64 Image into Plotly with Explicit Anchors
-        fig.add_layout_image(
-            dict(
-                source=img_uri,      # Using the Base64 URI instead of the raw PIL object
-                xref="x", yref="y",
-                x=dx_min, y=y_adjusted_max,
-                xanchor="left",      # Explicitly lock the X anchor
-                yanchor="top",       # Explicitly lock the Y anchor
-                sizex=cad_w,
-                sizey=true_image_height,
-                sizing="stretch", 
-                opacity=0.9,
-                layer="below"
-            )
-        )
-    else:
-        st.error(f"⚠️ Image Missing: The app is looking for an image named exactly '{img_path}' in your folder but cannot find it. Please rename your PNG file to match this string.")
-        
-    # Draw ONLY the path segment for this specific step in the journey
+    # 2. DRAW THE OPTIMAL ROUTE
     path_x = active_segment['x']
     path_y = active_segment['y']
     
@@ -244,35 +177,35 @@ if st.session_state.route_active:
         fig.add_trace(go.Scatter(
             x=path_x, y=path_y,
             mode='lines',
-            line=dict(color='red', width=4),
+            line=dict(color='red', width=5),
             name=f'{active_floor} Route'
         ))
         
-        # Mark Local Start/End Points for this specific step
-        # If this is Step 2, the "Start" marker visually drops exactly on the elevator node.
+        # Mark Local Start/End Points
         fig.add_trace(go.Scatter(
             x=[path_x[0], path_x[-1]], 
             y=[path_y[0], path_y[-1]],
             mode='markers+text',
-            marker=dict(color=['green', 'blue'], size=[12, 12]),
+            marker=dict(color=['green', 'blue'], size=[14, 14], line=dict(color='white', width=2)),
             text=['Start Here', 'End Here'],
             textposition="top center",
+            textfont=dict(size=14, color="white"),
             name='Anchor Points'
         ))
         
+    # 3. CONFIGURE PLOTLY (AUTO-SCALING)
+    # We lock the scaleanchor so the map doesn't warp, but let Plotly auto-zoom to the data
     fig.update_layout(
-        xaxis=dict(range=[dx_min, dx_max], showgrid=False, zeroline=False, visible=False),
-        yaxis=dict(range=[dy_min, dy_max], showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1),
-        margin=dict(l=0, r=0, t=0, b=0),
-        plot_bgcolor="rgba(0,0,0,0)"
+        xaxis=dict(showgrid=False, zeroline=False, visible=False),
+        yaxis=dict(showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1),
+        margin=dict(l=10, r=10, t=10, b=10),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        showlegend=False
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    # We set a fixed height so the map looks good on screen
+    st.plotly_chart(fig, use_container_width=True, height=600)
     
-    # ==========================================
-    # TEXT ITINERARY
-    # ==========================================
     st.markdown("### 📋 Step-by-Step Itinerary")
     st.text(st.session_state.itinerary_text)
-
-    path = nx.shortest_path(safe_G, s_node, e_node, weight='weight')
