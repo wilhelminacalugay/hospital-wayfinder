@@ -331,28 +331,35 @@ def find_optimized_paths(graph, destinations, start, end, role):
         return f"Access Denied: This route crosses through restricted areas for a {role}.", []
 
     try:
+        try:
         raw_paths = list(itertools.islice(nx.shortest_simple_paths(safe_G, s_node, e_node, weight='weight'), 20))
         
-        logical_paths = []
-        for p in raw_paths:
+        # ---------------------------------------------------------
+        # THE GOLDEN ROUTE EXEMPTION
+        # Always protect Option 1. If it "bounces", it's a CAD glitch, not a bad route.
+        # ---------------------------------------------------------
+        logical_paths = [raw_paths[0]] 
+        
+        # Apply the Anti-Bounce Filter ONLY to the alternatives (Paths 2-20)
+        for p in raw_paths[1:]:
             visited_floors = []
             is_valid = True
             for node in p:
                 floor = get_floor_from_y(node[1])
                 if not visited_floors or visited_floors[-1] != floor:
                     if floor in visited_floors:
-                        is_valid = False 
+                        is_valid = False # Real Bounce Detected! Kill this alternative.
                         break
                     visited_floors.append(floor)
             if is_valid:
                 logical_paths.append(p)
                 
+        # Keep up to 3 paths
         final_paths = logical_paths[:3]
-        
-        if not final_paths:
-            return "No logical alternatives found.", []
 
         output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
+        
+        # ... (The rest of your step_sequence and output code remains exactly the same)
         
         for i, path in enumerate(final_paths, 1):
             step_sequence = []
