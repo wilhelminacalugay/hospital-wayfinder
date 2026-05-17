@@ -332,14 +332,48 @@ def find_optimized_paths(graph, destinations, start, end, role):
             visited_floors = []
             is_valid = True
             
-            for node in p:
-                # We use the Y-coordinate helper you added in the last step
-                floor = get_floor_from_y(node[1])
-                if not visited_floors or visited_floors[-1] != floor:
-                    if floor in visited_floors:
-                        is_valid = False # Bounce Detected! Kill this route.
-                        break
-                    visited_floors.append(floor)
+            # 4. BUILD THE RICH TURN-BY-TURN TEXT
+        output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
+        path_data = []
+        
+        for i, path in enumerate(final_paths, 1):
+            step_sequence = []
+            current_floor = get_floor_from_y(path[0][1])
+            step_sequence.append(f"Start at {start}")
+            
+            for j, node in enumerate(path):
+                node_floor = get_floor_from_y(node[1])
+                
+                # Grab the text label of the node (if it has one)
+                node_label = safe_G.nodes[node].get('label', '').upper()
+                
+                # Detect if we changed floors
+                if node_floor != current_floor:
+                    # Dynamically determine the transit method by reading the CAD labels
+                    transit_method = "Stairs/Elevator" # Failsafe
+                    
+                    if "ELEV" in node_label:
+                        transit_method = "Elevator"
+                    elif "STAIR" in node_label:
+                        transit_method = "Stairs"
+                    elif j > 0:
+                        # Sometimes the CAD label is attached to the previous node (just before the jump)
+                        prev_label = safe_G.nodes[path[j-1]].get('label', '').upper()
+                        if "ELEV" in prev_label:
+                            transit_method = "Elevator"
+                        elif "STAIR" in prev_label:
+                            transit_method = "Stairs"
+
+                    step_sequence.append(f"Take {transit_method} to {node_floor}")
+                    current_floor = node_floor
+                
+                # Detect if we are passing a labeled room along the way
+                if node_label and node_label not in [start, end]:
+                    # Skip printing the transit nodes again so we don't say "Pass by STAIR (UG)"
+                    if "STAIR" not in node_label and "ELEV" not in node_label:
+                        step_sequence.append(f"Pass by {node_label}")
+                            
+            step_sequence.append(f"Arrive at {end}")
                     
             if is_valid:
                 logical_paths.append(p)
