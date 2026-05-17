@@ -202,15 +202,40 @@ def build_hospital_graph(dxf_file_path):
         "WATER TANK AREA 1": "", "WATER TANK AREA 2": "",
     }
 
-    raw_lines = []
+    # 1. Group lines by their DXF layer so we don't lose the floor data
+    lines_by_layer = {}
     for entity in msp.query('LWPOLYLINE LINE'):
+        layer_name = entity.dxf.layer.upper() # e.g., 'UG', 'F1'
+        if layer_name not in lines_by_layer:
+            lines_by_layer[layer_name] = []
+            
         if entity.dxftype() == 'LINE':
             s, e = (round(entity.dxf.start.x, 1), round(entity.dxf.start.y, 1)), (round(entity.dxf.end.x, 1), round(entity.dxf.end.y, 1))
-            if s != e: raw_lines.append(LineString([s, e]))
+            if s != e: lines_by_layer[layer_name].append(LineString([s, e]))
         elif entity.dxftype() == 'LWPOLYLINE':
             pts = [(round(p[0], 1), round(p[1], 1)) for p in entity.get_points('xy')]
             for i in range(len(pts)-1):
-                if pts[i] != pts[i+1]: raw_lines.append(LineString([pts[i], pts[i+1]]))
+                if pts[i] != pts[i+1]: lines_by_layer[layer_name].append(LineString([pts[i], pts[i+1]]))
+
+    # 2. Merge lines ONLY within their specific floor/layer
+    for layer_name, raw_lines in lines_by_layer.items():
+        merged = unary_union(raw_lines)
+        clean_lines = list(merged.geoms) if merged.geom_type == 'MultiLineString' else [merged]
+
+        for line in clean_lines:
+            coords = list(line.coords)
+            for i in range(len(coords)-1):
+                dist_m = calculate_distance(coords[i], coords[i+1]) / 1000.0
+                
+                # Add the edge
+                G.add_edge(coords[i], coords[i+1], weight=dist_m / SPEED_FLAT)
+                
+                # Assign the floor/layer to the individual nodes! 
+                # This is what app.py needs for the Z-Axis Slicer.
+                G.nodes[coords[i]]['layer'] = layer_name
+                G.nodes[coords[i+1]]['layer'] = layer_name
+                
+                all_endpoints.update([coords[i], coords[i+1]])
 
     merged = unary_union(raw_lines)
     clean_lines = list(merged.geoms) if merged.geom_type == 'MultiLineString' else [merged]
