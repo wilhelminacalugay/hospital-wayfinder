@@ -300,27 +300,27 @@ def get_restrictions(role):
     """
     Returns a list of text keywords that the selected role is FORBIDDEN from entering.
     """
-    role = role.upper()
+    #role = role.upper()
     
     # Common private areas that general public shouldn't wander into
-    private_medical_areas = ["OPERATING", "SURG", "LAB", "MORGUE", "STORAGE", "UTILITY"]
-    private_staff_areas = ["STAFF", "ADMIN", "SERVER", "IT", "DOCTOR", "NURSE"]
+    #private_medical_areas = ["OPERATING", "SURG", "LAB", "MORGUE", "STORAGE", "UTILITY"]
+    #private_staff_areas = ["STAFF", "ADMIN", "SERVER", "IT", "DOCTOR", "NURSE"]
     
     # "SERVICE" covers Service Elevators and Service Hallways
-    general_public_restrictions = private_medical_areas + private_staff_areas + ["SERVICE"]
+    #general_public_restrictions = private_medical_areas + private_staff_areas + ["SERVICE"]
 
-    if role in ["PATIENT", "VISITOR"]:
-        return general_public_restrictions
+    #if role in ["PATIENT", "VISITOR"]:
+        #return general_public_restrictions
         
-    elif role == "PWD":
+    #elif role == "PWD":
         # PWD gets the same restrictions as public, PLUS we ban "STAIR" 
         # to force the routing engine to exclusively find Elevator paths.
-        return general_public_restrictions + ["STAIR"]
+        #return general_public_restrictions + ["STAIR"]
         
-    elif role in ["DOCTOR", "NURSE", "STAFF"]:
+    #elif role in ["DOCTOR", "NURSE", "STAFF"]:
         # Medical and hospital staff have full master access.
         # They can use Service Elevators, Stairs, and enter private wings.
-        return [] 
+        #return [] 
         
     return []
 
