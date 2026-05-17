@@ -5,7 +5,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from shapely.geometry import LineString
 from shapely.ops import unary_union
-from itertools import islice
+from itertools 
+import islice
 
 # ==========================================
 # LITERATURE & ASSUMPTION VALUES 
