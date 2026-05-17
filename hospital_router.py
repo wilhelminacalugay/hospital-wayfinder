@@ -36,11 +36,22 @@ DETECTION_Y_BOUNDS = {
 }
 
 def get_floor_from_y(y):
-    """Mathematically detects the floor using a tight 100-unit buffer."""
+    """Magnetically snaps Y-coordinates to the closest floor to prevent fake bounces."""
+    best_floor = "UG"
+    min_dist = float('inf')
+    
     for floor, (ymin, ymax) in DETECTION_Y_BOUNDS.items():
-        if (ymin - 100) <= y <= (ymax + 100):
+        # If perfectly inside the bounds
+        if ymin <= y <= ymax:
             return floor
-    return "UG" # Failsafe
+            
+        # If outside, snap to the closest floor edge
+        dist = min(abs(y - ymin), abs(y - ymax))
+        if dist < min_dist:
+            min_dist = dist
+            best_floor = floor
+            
+    return best_floor
 
 def calculate_distance(p1, p2):
     return math.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)
