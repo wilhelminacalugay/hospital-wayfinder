@@ -287,26 +287,60 @@ if st.session_state.route_active:
             name='Anchor Points'
         ))
         
-    # MOBILE-FRIENDLY MAP LOCK
+    # MOBILE-FRIENDLY MAP UNLOCKED FOR ZOOM & PAN
     fig.update_layout(
-        xaxis=dict(showgrid=False, zeroline=False, visible=False, fixedrange=True),
-        yaxis=dict(showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1, fixedrange=True),
+        xaxis=dict(showgrid=False, zeroline=False, visible=False, fixedrange=False), # Unlocked
+        yaxis=dict(showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1, fixedrange=False), # Unlocked
         margin=dict(l=0, r=0, t=0, b=0),
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         showlegend=False,
-        dragmode=False 
+        dragmode="pan" # Allows fingers/mouse to drag and slide the map around seamlessly
     )
     
-    # Hides the Plotly toolbar
-    st.plotly_chart(fig, use_container_width=True, height=600, config={'displayModeBar': False})
+    # Enabled scrollZoom so desktop users can scroll-wheel zoom, and mobile users can pinch-zoom
+    st.plotly_chart(fig, use_container_width=True, height=600, config={'scrollZoom': True, 'displayModeBar': False})
 
     # --- 6. REAL AS-BUILT REFERENCE ---
     st.markdown("---")
     with st.expander(f"View Original As-Built Plan for {active_floor} Floor"):
         image_filename = f"{active_floor}_plan.jpg" 
         try:
-            st.image(image_filename, caption=f"Original CAD Blueprint - {active_floor} Floor", use_container_width=True)
+            from PIL import Image
+            # Open the image file to read its natural width and height
+            img = Image.open(image_filename)
+            img_w, img_h = img.size
+            
+            # Create a dedicated zoomable canvas for the blueprint
+            fig_blueprint = go.Figure()
+            
+            fig_blueprint.add_layout_image(
+                dict(
+                    source=img,
+                    xref="x", yref="y",
+                    x=0, y=img_h,      # Anchor at top-left corner
+                    sizex=img_w,
+                    sizey=img_h,
+                    sizing="stretch",
+                    layer="below"
+                )
+            )
+            
+            # Configure the blueprint viewer layout to match its dimensions
+            fig_blueprint.update_layout(
+                xaxis=dict(range=[0, img_w], showgrid=False, zeroline=False, visible=False, fixedrange=False),
+                yaxis=dict(range=[0, img_h], showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1, fixedrange=False),
+                margin=dict(l=0, r=0, t=0, b=0),
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                showlegend=False,
+                dragmode="pan",  # Defaults touch interface to sliding around the blueprint
+                height=500       # Clean display height on mobile screens
+            )
+            
+            # Render the blueprint with active scroll/pinch zooming features
+            st.plotly_chart(fig_blueprint, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
+            
         except FileNotFoundError:
             st.warning(f"Please upload '{image_filename}' to the project folder to view it here.")
             
