@@ -198,6 +198,48 @@ if st.session_state.route_active:
         hoverinfo='none',
         name='Hospital Layout'
     ))
+
+    # ---------------------------------------------------------
+    # NEW: DRAW THE WAYFINDING NODES (BLUE DOTS)
+    # ---------------------------------------------------------
+    node_x = []
+    node_y = []
+    for n in graph.nodes():
+        if get_floor_from_coords(n[0], n[1]) == active_floor:
+            node_x.append(n[0])
+            node_y.append(n[1])
+
+    fig.add_trace(go.Scatter(
+        x=node_x, y=node_y,
+        mode='markers',
+        marker=dict(size=4, color='blue', opacity=0.4),
+        hoverinfo='x+y', # Shows coordinates on mouse hover
+        name='Wayfinding Nodes'
+    ))
+
+    # ---------------------------------------------------------
+    # NEW: DRAW THE NAMED DESTINATIONS (ORANGE DOTS WITH TEXT)
+    # ---------------------------------------------------------
+    dest_x = []
+    dest_y = []
+    dest_names = []
+    for name, pt in destinations.items():
+        if get_floor_from_coords(pt[0], pt[1]) == active_floor:
+            dest_x.append(pt[0])
+            dest_y.append(pt[1])
+            dest_names.append(name)
+
+    fig.add_trace(go.Scatter(
+        x=dest_x, y=dest_y,
+        mode='markers+text',
+        text=dest_names,
+        textposition="top center",
+        textfont=dict(size=9, color="orange"),
+        marker=dict(size=6, color='orange', opacity=0.8),
+        hoverinfo='text',
+        name='Destinations'
+    ))
+    # ---------------------------------------------------------
         
     # DRAW THE OPTIMAL ROUTE
     path_x = active_segment['x']
