@@ -464,7 +464,7 @@ def find_optimized_paths(graph, destinations, start, end, role):
                         break
             
             if not is_valid:
-                continue 
+                pass # DEBUG: We disabled the Anti-Bounce kill switch! 
                     
             # ---------------------------------------------------------
             # FILTER 2: THE STRICT TRANSFER BAN
@@ -490,7 +490,7 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 was_on_transit = is_transit
             
             if transit_hops > 1:
-                continue
+                pass # DEBUG: We disabled the Transit Transfer kill switch!
             
             is_mixed = 1 if (uses_elev and uses_stair) else 0
             real_weight = sum(safe_G[p[i]][p[i+1]]['weight'] for i in range(len(p)-1))
