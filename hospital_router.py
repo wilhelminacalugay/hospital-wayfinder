@@ -555,17 +555,17 @@ def find_optimized_paths(graph, destinations, start, end, role):
             
             # Slot 1: The overall Best Route (Fastest, regardless of transit)
             if best_route is None:
-                sp['name'] = "⭐ Best Route"
+                sp['name'] = "Best Route"
                 best_route = sp
                 
             # Slot 2: The Pure Elevator Route (No stairs allowed)
             elif not uses_stair and elev_route is None and not is_clone(path, [best_route]):
-                sp['name'] = "🛗 Pure Elevator Route"
+                sp['name'] = "Pure Elevator Route"
                 elev_route = sp
                 
             # Slot 3: The Pure Stairs Route (No elevators allowed)
             elif not uses_elev and stair_route is None and not is_clone(path, [best_route, elev_route]):
-                sp['name'] = "🏃 Pure Stairs Route"
+                sp['name'] = "Pure Stairs Route"
                 stair_route = sp
 
         # Gather the routes we successfully found
