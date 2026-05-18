@@ -3,7 +3,7 @@
 primaryColor="#dedede"
 
 # The main background color of the website
-backgroundColor="FFFFFF"
+backgroundColor="#FFFFFF"
 
 # The background color of the sidebar
 secondaryBackgroundColor="#03542b"
