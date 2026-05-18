@@ -18,20 +18,14 @@ st.set_page_config(page_title="Smart Hospital Wayfinder", layout="wide")
 st.markdown(
     """
     <style>
-    /* 1. Changes the text color of the currently SELECTED option in the box */
-    div[data-baseweb="select"] > div {
-        color: #03542b !important; 
+    /* Target all text inside the sidebar and make it Gold */
+    [data-testid="stSidebar"] {
+        color: #fcba06;
     }
     
-    /* 2. Changes the text color of the list of options in the POP-OUT menu */
-    ul[role="listbox"] li {
-        color: #03542b !important; 
-    }
-    
-    /* Optional: Changes the background color of the option you hover over */
-    ul[role="listbox"] li:hover {
-        background-color: #eef7f2 !important;
-        color: #03542b !important;
+    /* Ensure markdown text in the sidebar also turns Gold */
+    [data-testid="stSidebar"] * {
+        color: #fcba06 !important;
     }
     </style>
     """,
