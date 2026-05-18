@@ -517,31 +517,40 @@ def find_optimized_paths(graph, destinations, start, end, role):
         # 2. THE GOLDEN SORT
         scored_paths.sort(key=lambda x: (x['is_mixed'], x['transit_hops'], x['weight']))
         
-        # 3. ANTI-CLONE FILTER
+        # ---------------------------------------------------------
+        # 3. ANTI-CLONE FILTER (Fixed to keep metadata!)
+        # ---------------------------------------------------------
         logical_paths = []
         for sp in scored_paths:
             p = sp['path']
             is_clone = False
             p_set = set(p)
-            for approved in logical_paths:
-                approved_set = set(approved)
+            for approved_sp in logical_paths:
+                approved_set = set(approved_sp['path'])
                 overlap = len(p_set.intersection(approved_set)) / min(len(p_set), len(approved_set))
                 if overlap > 0.80:
                     is_clone = True
                     break
                     
             if not is_clone:
-                logical_paths.append(p)
+                logical_paths.append(sp) # Keep the whole dictionary, not just the path!
                 
             if len(logical_paths) == 3:
                 break
                 
         final_paths = logical_paths
 
-        # 4. ITINERARY BUILDER
+        # ---------------------------------------------------------
+        # 4. ITINERARY BUILDER (Now with Time & Turns!)
+        # ---------------------------------------------------------
         output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
         
-        for i, path in enumerate(final_paths, 1):
+        for i, sp in enumerate(final_paths, 1):
+            path = sp['path']
+            total_seconds = sp['weight']
+            turns = count_turns(path)
+            time_str = format_time(total_seconds)
+            
             step_sequence = []
             current_floor = get_floor_from_y(path[0][1])
             step_sequence.append(f"Start at {start}")
@@ -555,7 +564,6 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 
                 if node_floor != current_floor:
                     transit_method = "Stairs/Elevator" 
-                    # FIX: Look for the underscore for UI generation too
                     if "ELEVATOR_" in node_label:
                         transit_method = "Elevator"
                         uses_elev = True
@@ -589,10 +597,13 @@ def find_optimized_paths(graph, destinations, start, end, role):
             else:
                 route_tag = "[Same Floor - Direct Walk]"
             
-            output += f"OPTION {i} {route_tag}:\n"
+            # THE NEW METRICS HEADER
+            output += f"OPTION {i} {route_tag}  ( ⏱️ {time_str} | ↪️ {turns} Turns )\n"
             output += " ➔ ".join(step_sequence) + "\n\n"
             
-        return output, final_paths
+        # We need to return just the paths to Streamlit, so we extract them here
+        just_the_paths = [sp['path'] for sp in final_paths]
+        return output, just_the_paths
         
     except nx.NetworkXNoPath:
         return f"[{role} ERROR] No valid path found.", []
