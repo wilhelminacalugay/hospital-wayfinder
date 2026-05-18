@@ -72,11 +72,9 @@ def get_floor_from_coords(x, y):
     min_dist = float('inf')
     
     for floor, (ymin, ymax) in DETECTION_Y_BOUNDS.items():
-        # If it is perfectly inside the bounds, return immediately
         if ymin <= y <= ymax:
             return floor
             
-        # If it is slightly outside, calculate the distance to the nearest edge
         dist = min(abs(y - ymin), abs(y - ymax))
         if dist < min_dist:
             min_dist = dist
@@ -107,92 +105,61 @@ if 'route_segments' not in st.session_state:
     st.session_state.route_segments = []
 
 # ==========================================
-# USER INTERFACE (SIDEBAR)
+# USER INTERFACE (MOBILE-FRIENDLY MAIN PAGE)
 # ==========================================
-st.sidebar.header("Navigation Setup")
+st.markdown("###Where do you need to go?")
 
 roles = ["PATIENT", "VISITOR", "NURSE", "DOCTOR", "STAFF", "PWD"]
-selected_role = st.sidebar.selectbox("Select User Role", roles)
-
 room_names = sorted(list(destinations.keys()))
-start_room = st.sidebar.selectbox("Starting Point", room_names, index=0)
-end_room = st.sidebar.selectbox("Destination", room_names, index=1)
+
+col1, col2 = st.columns(2)
+with col1:
+    start_room = st.selectbox("Starting Point", room_names, index=0)
+with col2:
+    end_room = st.selectbox("Destination", room_names, index=1)
+
+selected_role = st.selectbox("Select User Role", roles)
 
 # ==========================================
 # ROUTING CALCULATIONS
 # ==========================================
-if st.sidebar.button("Calculate Route"):
+# Changed to st.button so it's on the main page, and made it full width for mobile
+if st.button("Calculate Route", use_container_width=True):
     if start_room == end_room:
         st.warning("Start and Destination are the same!")
         st.session_state.route_active = False
     else:
-        # Catch BOTH the data dictionary and the raw paths
         route_data, all_paths = find_optimized_paths(
             graph, destinations, start_room, end_room, selected_role
         )
         
         if not all_paths: 
-            st.error(route_data) # If it fails, route_data holds the error message
+            st.error(route_data) 
             st.session_state.route_active = False
         else:
             st.session_state.all_paths = all_paths
-            st.session_state.route_data = route_data # Save the new data!
+            st.session_state.route_data = route_data 
             st.session_state.route_active = True
 
-# ==========================================
-# TEMPORARY DEBUG TOOLS
-# ==========================================
-# st.sidebar.markdown("---")
-# if st.sidebar.button("Run Island Finder"):
-    # import networkx as nx
-    
-    # Convert to an undirected graph for checking connections
-    # check_G = graph.to_undirected()
-    # islands = list(nx.connected_components(check_G))
-    
-    # if len(islands) > 1:
-        # st.sidebar.error(f"WARNING: Graph broken into {len(islands)} pieces!")
-        
-        # Sort islands by size (the biggest one is the main hospital)
-        # islands.sort(key=len, reverse=True)
-        
-        # Print the disconnected rooms directly to the sidebar
-        # for i, island in enumerate(islands[1:], 1):
-            # floating_labels = [check_G.nodes[n].get('label', str(n)) for n in island]
-            # st.sidebar.warning(f"**Disconnected Piece #{i}:**\n" + ", ".join(floating_labels))
-    # else:
-        # st.sidebar.success("The hospital grid is perfectly connected!")
-        
 # ==========================================
 # VISUALIZATION & MULTI-FLOOR UI
 # ==========================================
 if st.session_state.route_active:
     st.success("Routes generated successfully!")
     
-    import pandas as pd
+    # --- 1. MOBILE-FRIENDLY ROUTE CARDS ---
+    st.markdown("###Route Options")
     
-    # --- 1. THE NEW ROUTE COMPARISON TABLE ---
-    st.markdown("### Route Options")
-    
-    # Build a clean dataframe for the user to read
-    table_data = []
     for r in st.session_state.route_data:
-        table_data.append({
-            "Route Type": r['name'],
-            "Est. Time": r['time'],
-            "Turns": r['turns'],
-            "Directions": r['steps']
-        })
-        
-    df = pd.DataFrame(table_data)
-    
-    # Display it cleanly without the index numbers
-    st.table(df.set_index("Route Type")) 
+        # This creates a visually distinct box for each route option
+        with st.container(border=True):
+            st.markdown(f"#### {r['name']}")
+            st.markdown(f"**Est. Time:** {r['time']} &nbsp; | &nbsp; **Turns:** {r['turns']}")
+            st.caption(r['steps'])
 
     st.markdown("---")
     
     # --- 2. THE NEW DYNAMIC DROPDOWN ---
-    # Extract the names we created in the backend (e.g., "Best Route")
     path_options = [r['name'] for r in st.session_state.route_data]
     
     col1, col2 = st.columns([1, 2])
@@ -202,7 +169,7 @@ if st.session_state.route_active:
     path_idx = path_options.index(selected_path_name)
     active_path = st.session_state.all_paths[path_idx]
     
-    # --- 2. DYNAMIC SLICER (Runs on the selected option) ---
+    # --- 3. DYNAMIC SLICER (Runs on the selected option) ---
     segments = []
     first_x, first_y = active_path[0][0], active_path[0][1]
     current_floor = get_floor_from_coords(first_x, first_y)
@@ -228,7 +195,7 @@ if st.session_state.route_active:
     
     st.markdown("---")
     
-    # --- 3. FLOOR NAVIGATION UI ---
+    # --- 4. FLOOR NAVIGATION UI ---
     if len(valid_segments) > 1:
         st.info("This route spans multiple floors. Follow the steps below sequentially.")
     
@@ -237,10 +204,10 @@ if st.session_state.route_active:
     active_segment = valid_segments[active_idx]
     active_floor = active_segment['floor']
     
-    # --- 4. PLOTLY MAP VISUALIZATION ---
+    # --- 5. PLOTLY MAP VISUALIZATION ---
     fig = go.Figure()
     
-    # DRAW THE BLUEPRINT (BACKGROUND SKELETON)
+    # DRAW THE BLUEPRINT
     edge_x = []
     edge_y = []
     for u, v in graph.edges():
@@ -256,9 +223,7 @@ if st.session_state.route_active:
         name='Hospital Layout'
     ))
 
-    # ---------------------------------------------------------
-    # NEW: DRAW THE WAYFINDING NODES (BLUE DOTS)
-    # ---------------------------------------------------------
+    # DRAW THE WAYFINDING NODES
     node_x = []
     node_y = []
     for n in graph.nodes():
@@ -270,15 +235,11 @@ if st.session_state.route_active:
         x=node_x, y=node_y,
         mode='markers',
         marker=dict(size=4, color='blue', opacity=0.4),
-        hoverinfo='x+y', # Shows coordinates on mouse hover
+        hoverinfo='x+y',
         name='Wayfinding Nodes'
     ))
 
-    # ---------------------------------------------------------
-    # NEW: DRAW THE NAMED DESTINATIONS (ORANGE DOTS WITH TEXT)
-    # ---------------------------------------------------------
-    import textwrap # Make sure this is at the top of your file!
-
+    # DRAW THE NAMED DESTINATIONS
     dest_x = []
     dest_y = []
     dest_names = []
@@ -287,7 +248,6 @@ if st.session_state.route_active:
             dest_x.append(pt[0])
             dest_y.append(pt[1])
             
-            # This slices the text every 15 characters, and limits it to 3 rows max
             wrapped_lines = textwrap.wrap(name, width=15)[:3] 
             wrapped_text = "<br>".join(wrapped_lines) 
             
@@ -303,7 +263,6 @@ if st.session_state.route_active:
         hoverinfo='text',
         name='Destinations'
     ))
-    # ---------------------------------------------------------
         
     # DRAW THE OPTIMAL ROUTE
     path_x = active_segment['x']
@@ -328,27 +287,30 @@ if st.session_state.route_active:
             name='Anchor Points'
         ))
         
+    # MOBILE-FRIENDLY MAP LOCK
     fig.update_layout(
-        xaxis=dict(showgrid=False, zeroline=False, visible=False),
-        yaxis=dict(showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1),
-        margin=dict(l=10, r=10, t=10, b=10),
+        xaxis=dict(showgrid=False, zeroline=False, visible=False, fixedrange=True),
+        yaxis=dict(showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1, fixedrange=True),
+        margin=dict(l=0, r=0, t=0, b=0),
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
-        showlegend=False
+        showlegend=False,
+        dragmode=False 
     )
     
-    st.plotly_chart(fig, use_container_width=True, height=600)
+    # Hides the Plotly toolbar
+    st.plotly_chart(fig, use_container_width=True, height=600, config={'displayModeBar': False})
 
     # --- 6. REAL AS-BUILT REFERENCE ---
     st.markdown("---")
     with st.expander(f"View Original As-Built Plan for {active_floor} Floor"):
-        # Dynamically load the correct image based on the floor they are looking at!
         image_filename = f"{active_floor}_plan.jpg" 
         try:
             st.image(image_filename, caption=f"Original CAD Blueprint - {active_floor} Floor", use_container_width=True)
         except FileNotFoundError:
             st.warning(f"Please upload '{image_filename}' to the project folder to view it here.")
+            
     # --- 7. DEVELOPER X-RAY VISION ---
     st.markdown("---")
-    with st.expander("🛠️ Developer Mode: View Raw Routing Math"):
+    with st.expander("Developer Mode: View Raw Routing Math"):
         st.write(st.session_state.route_data)
