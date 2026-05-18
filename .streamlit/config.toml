@@ -1,15 +1,15 @@
 [theme]
 # The main accent color (used for the 'Calculate Route' button, loading bars, etc.)
-primaryColor="#03542b"
+primaryColor="#dedede"
 
 # The main background color of the website
-backgroundColor="#dedede"
+backgroundColor="FFFFFF"
 
 # The background color of the sidebar
-secondaryBackgroundColor="#f7c812"
+secondaryBackgroundColor="#03542b"
 
 # The color of the text
-textColor="FFFFFF"
+textColor="#03542b"
 
 # Font style ("sans serif", "serif", or "monospace")
 font="sans serif"
