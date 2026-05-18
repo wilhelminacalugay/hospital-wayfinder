@@ -22,10 +22,29 @@ st.markdown(
     [data-testid="stSidebar"] {
         color: #fcba06;
     }
-    
-    /* Ensure markdown text in the sidebar also turns Gold */
     [data-testid="stSidebar"] * {
         color: #fcba06 !important;
+    }
+
+    /* 1. Changes the text color of the currently SELECTED option in the main page dropdown to GOLD */
+    div[data-baseweb="select"] > div {
+        color: #fcba06 !important; 
+    }
+    
+    /* Ensures the specific text span inside the box also turns gold */
+    div[data-baseweb="select"] > div span {
+        color: #fcba06 !important; 
+    }
+    
+    /* 2. Keeps the list of options in the POP-OUT menu dark green so they are readable against a white background */
+    ul[role="listbox"] li {
+        color: #03542b !important; 
+    }
+    
+    /* Optional: Changes the background color of the option you hover over */
+    ul[role="listbox"] li:hover {
+        background-color: #eef7f2 !important;
+        color: #03542b !important;
     }
     </style>
     """,
