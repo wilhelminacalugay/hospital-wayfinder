@@ -1,6 +1,7 @@
 import streamlit as st
 import networkx as nx
 import plotly.graph_objects as go
+import textwrap
 
 # ---------------------------------------------------------
 # THE GITHUB IMPORT FIX
@@ -220,6 +221,8 @@ if st.session_state.route_active:
     # ---------------------------------------------------------
     # NEW: DRAW THE NAMED DESTINATIONS (ORANGE DOTS WITH TEXT)
     # ---------------------------------------------------------
+    import textwrap # Make sure this is at the top of your file!
+
     dest_x = []
     dest_y = []
     dest_names = []
@@ -227,7 +230,12 @@ if st.session_state.route_active:
         if get_floor_from_coords(pt[0], pt[1]) == active_floor:
             dest_x.append(pt[0])
             dest_y.append(pt[1])
-            dest_names.append(name)
+            
+            # This slices the text every 15 characters, and limits it to 3 rows max
+            wrapped_lines = textwrap.wrap(name, width=15)[:3] 
+            wrapped_text = "<br>".join(wrapped_lines) 
+            
+            dest_names.append(wrapped_text)
 
     fig.add_trace(go.Scatter(
         x=dest_x, y=dest_y,
@@ -274,6 +282,16 @@ if st.session_state.route_active:
     )
     
     st.plotly_chart(fig, use_container_width=True, height=600)
+
+    # --- 6. REAL AS-BUILT REFERENCE ---
+    st.markdown("---")
+    with st.expander(f"🗺️ View Original As-Built Plan for {active_floor} Floor"):
+        # Dynamically load the correct image based on the floor they are looking at!
+        image_filename = f"{active_floor}_plan.jpg" 
+        try:
+            st.image(image_filename, caption=f"Original CAD Blueprint - {active_floor} Floor", use_container_width=True)
+        except FileNotFoundError:
+            st.warning(f"Please upload '{image_filename}' to the project folder to view it here.")
     
     # --- 5. PRINT TEXT ITINERARY ---
     st.markdown("### 📋 Turn-by-Turn Itinerary")
