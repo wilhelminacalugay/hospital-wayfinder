@@ -50,7 +50,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-st.title("🏥 Smart Hospital Wayfinding System")
+st.title("Ospital ng Parañaque - District II Wayfinding System")
 
 # ---------------------------------------------------------
 # DETECTION BOUNDS (RAW CAD LIMITS FOR THE SLICER)
