@@ -107,7 +107,7 @@ if 'route_segments' not in st.session_state:
 # ==========================================
 # USER INTERFACE (MOBILE-FRIENDLY MAIN PAGE)
 # ==========================================
-st.markdown("###Where do you need to go?")
+st.markdown("### Where do you need to go?")
 
 roles = ["PATIENT", "VISITOR", "NURSE", "DOCTOR", "STAFF", "PWD"]
 room_names = sorted(list(destinations.keys()))
@@ -148,7 +148,7 @@ if st.session_state.route_active:
     st.success("Routes generated successfully!")
     
     # --- 1. MOBILE-FRIENDLY ROUTE CARDS ---
-    st.markdown("###Route Options")
+    st.markdown("### Route Options")
     
     for r in st.session_state.route_data:
         # This creates a visually distinct box for each route option
