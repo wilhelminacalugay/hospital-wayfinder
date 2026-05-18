@@ -289,7 +289,7 @@ def build_hospital_graph(dxf_file_path):
     # ---------------------------------------------------------
     # Set this to your CAD tolerance. If your CAD is in millimeters, 
     # 100.0 means it will snap gaps up to 10cm apart.
-    TOLERANCE = 100.0 
+    TOLERANCE = 200.0 
     
     mapping = {}
     current_nodes = list(G.nodes())
