@@ -248,48 +248,37 @@ def build_hospital_graph(dxf_file_path):
     }
 
     # ==========================================
-    # 1. GROUP LINES BY DXF LAYER
+    # 1. THE BIG SMASH (SHATTER AT INTERSECTIONS)
     # ==========================================
-    lines_by_layer = {}
+    all_raw_lines = []
+    
+    # Grab absolutely every line, completely ignoring CAD layers
     for entity in msp.query('LWPOLYLINE LINE'):
-        # THIS is where layer_name is officially defined!
-        layer_name = entity.dxf.layer.upper() 
-        
-        if layer_name not in lines_by_layer:
-            lines_by_layer[layer_name] = []
-            
         if entity.dxftype() == 'LINE':
             s, e = (round(entity.dxf.start.x, 1), round(entity.dxf.start.y, 1)), (round(entity.dxf.end.x, 1), round(entity.dxf.end.y, 1))
-            if s != e: lines_by_layer[layer_name].append(LineString([s, e]))
+            if s != e: all_raw_lines.append(LineString([s, e]))
         elif entity.dxftype() == 'LWPOLYLINE':
             pts = [(round(p[0], 1), round(p[1], 1)) for p in entity.get_points('xy')]
             for i in range(len(pts)-1):
-                if pts[i] != pts[i+1]: lines_by_layer[layer_name].append(LineString([pts[i], pts[i+1]]))
+                if pts[i] != pts[i+1]: all_raw_lines.append(LineString([pts[i], pts[i+1]]))
 
-    # ==========================================
-    # 2. MERGE & BUILD GRAPH BY LAYER
-    # ==========================================
-    for layer_name, raw_lines in lines_by_layer.items(): 
-        merged = unary_union(raw_lines)
-        clean_lines = list(merged.geoms) if merged.geom_type == 'MultiLineString' else [merged]
+    # Smash them all together! This forces Shapely to create a node at EVERY intersection.
+    merged = unary_union(all_raw_lines)
+    clean_lines = list(merged.geoms) if merged.geom_type == 'MultiLineString' else [merged]
 
-        for line in clean_lines:
-            coords = list(line.coords)
-            for i in range(len(coords)-1):
-                dist_m = calculate_distance(coords[i], coords[i+1]) / 1000.0
-                
-                G.add_node(coords[i], layer=layer_name)
-                G.add_node(coords[i+1], layer=layer_name)
-                G.add_edge(coords[i], coords[i+1], weight=dist_m / SPEED_FLAT)
-                
-                all_endpoints.update([coords[i], coords[i+1]])
+    for line in clean_lines:
+        coords = list(line.coords)
+        for i in range(len(coords)-1):
+            dist_m = calculate_distance(coords[i], coords[i+1]) / 1000.0
+            
+            # Add nodes and edges (Layer name is gone, we don't need it for routing!)
+            G.add_edge(coords[i], coords[i+1], weight=dist_m / SPEED_FLAT)
+            all_endpoints.update([coords[i], coords[i+1]])
 
     # ---------------------------------------------------------
-    # 🚨 NEW: THE NODE FUSION ALGORITHM (CAD SLOP FIX)
+    # 🚨 THE NODE FUSION ALGORITHM (Keep it at a low, safe number!)
     # ---------------------------------------------------------
-    # Set this to your CAD tolerance. If your CAD is in millimeters, 
-    # 100.0 means it will snap gaps up to 10cm apart.
-    TOLERANCE = 1500.0 
+    TOLERANCE = 150.0 
     
     mapping = {}
     current_nodes = list(G.nodes())
@@ -303,13 +292,11 @@ def build_hospital_graph(dxf_file_path):
             if other in mapping: 
                 continue
             if calculate_distance(n, other) <= TOLERANCE:
-                mapping[other] = n # Magnetically map 'other' to 'n'
+                mapping[other] = n
                 
-    # Fuse the graph together
     G = nx.relabel_nodes(G, mapping, copy=True)
-    G.remove_edges_from(nx.selfloop_edges(G)) # Destroy overlapping stubs
+    G.remove_edges_from(nx.selfloop_edges(G)) 
     
-    # Update the endpoints so the text parser snaps to the fixed grid
     all_endpoints = set(G.nodes())
     # ---------------------------------------------------------
 
