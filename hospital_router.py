@@ -269,7 +269,6 @@ def build_hospital_graph(dxf_file_path):
     # ==========================================
     # 2. MERGE & BUILD GRAPH BY LAYER
     # ==========================================
-    # The loop passes layer_name down to the node creation
     for layer_name, raw_lines in lines_by_layer.items(): 
         merged = unary_union(raw_lines)
         clean_lines = list(merged.geoms) if merged.geom_type == 'MultiLineString' else [merged]
@@ -279,16 +278,47 @@ def build_hospital_graph(dxf_file_path):
             for i in range(len(coords)-1):
                 dist_m = calculate_distance(coords[i], coords[i+1]) / 1000.0
                 
-                # Create the nodes with the layer attribute explicitly attached
                 G.add_node(coords[i], layer=layer_name)
                 G.add_node(coords[i+1], layer=layer_name)
-                
-                # Connect the nodes
                 G.add_edge(coords[i], coords[i+1], weight=dist_m / SPEED_FLAT)
                 
                 all_endpoints.update([coords[i], coords[i+1]])
 
+    # ---------------------------------------------------------
+    # 🚨 NEW: THE NODE FUSION ALGORITHM (CAD SLOP FIX)
+    # ---------------------------------------------------------
+    # Set this to your CAD tolerance. If your CAD is in millimeters, 
+    # 100.0 means it will snap gaps up to 10cm apart.
+    TOLERANCE = 100.0 
+    
+    mapping = {}
+    current_nodes = list(G.nodes())
+    
+    for n in current_nodes:
+        if n in mapping: 
+            continue
+        mapping[n] = n
+        
+        for other in current_nodes:
+            if other in mapping: 
+                continue
+            if calculate_distance(n, other) <= TOLERANCE:
+                mapping[other] = n # Magnetically map 'other' to 'n'
+                
+    # Fuse the graph together
+    G = nx.relabel_nodes(G, mapping, copy=True)
+    G.remove_edges_from(nx.selfloop_edges(G)) # Destroy overlapping stubs
+    
+    # Update the endpoints so the text parser snaps to the fixed grid
+    all_endpoints = set(G.nodes())
+    # ---------------------------------------------------------
+
+
+    # ==========================================
+    # 3. PARSE TEXT LABELS (Leave this part exactly as you have it)
+    # ==========================================
     for entity in msp.query('TEXT MTEXT'):
+        # ... (rest of your text code) ...
         txt = entity.plain_text().strip().upper() if entity.dxftype() == 'MTEXT' else entity.dxf.text.strip().upper()
         
         # Eradicate invisible CAD typos
