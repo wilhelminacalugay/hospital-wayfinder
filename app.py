@@ -348,7 +348,3 @@ if st.session_state.route_active:
             st.image(image_filename, caption=f"Original CAD Blueprint - {active_floor} Floor", use_container_width=True)
         except FileNotFoundError:
             st.warning(f"Please upload '{image_filename}' to the project folder to view it here.")
-    
-    # --- 5. PRINT TEXT ITINERARY ---
-    st.markdown("### 📋 Turn-by-Turn Itinerary")
-    st.text(st.session_state.itinerary_text)
