@@ -530,11 +530,24 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 if ap is None: continue
                 ap_set = set(ap['path'])
                 overlap = len(new_set.intersection(ap_set)) / min(len(new_set), len(ap_set))
-                if overlap > 0.85: return True
+                if overlap > 85: return True
             return False
 
         for sp in scored_paths:
             path = sp['path']
+            
+            # --- THE NEW ANTI-BOUNCE FILTER ---
+            visited_floors = []
+            for node in path:
+                floor = get_floor_from_y(node[1])
+                if not visited_floors or visited_floors[-1] != floor:
+                    visited_floors.append(floor)
+            
+            # If the length of the list doesn't match the length of the SET, 
+            # it means a floor appears twice (e.g., UG, 2F, 3F, 2F). Kill the route!
+            if len(visited_floors) != len(set(visited_floors)):
+                continue 
+            # ----------------------------------
             
             # Scan the path to see what transit it uses
             uses_elev = any("ELEVATOR_" in safe_G.nodes[n].get('label', '').upper() for n in path)
@@ -542,17 +555,17 @@ def find_optimized_paths(graph, destinations, start, end, role):
             
             # Slot 1: The overall Best Route (Fastest, regardless of transit)
             if best_route is None:
-                sp['name'] = "Best Route"
+                sp['name'] = "⭐ Best Route"
                 best_route = sp
                 
             # Slot 2: The Pure Elevator Route (No stairs allowed)
             elif not uses_stair and elev_route is None and not is_clone(path, [best_route]):
-                sp['name'] = "Pure Elevator Route"
+                sp['name'] = "🛗 Pure Elevator Route"
                 elev_route = sp
                 
             # Slot 3: The Pure Stairs Route (No elevators allowed)
             elif not uses_elev and stair_route is None and not is_clone(path, [best_route, elev_route]):
-                sp['name'] = "Pure Stairs Route"
+                sp['name'] = "🏃 Pure Stairs Route"
                 stair_route = sp
 
         # Gather the routes we successfully found
