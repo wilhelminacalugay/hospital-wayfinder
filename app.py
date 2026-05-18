@@ -140,10 +140,10 @@ if st.sidebar.button("Calculate Route"):
             st.session_state.route_active = True
 
 # ==========================================
-# 🛠️ TEMPORARY DEBUG TOOLS
+# TEMPORARY DEBUG TOOLS
 # ==========================================
 # st.sidebar.markdown("---")
-# if st.sidebar.button("🔍 Run Island Finder"):
+# if st.sidebar.button("Run Island Finder"):
     # import networkx as nx
     
     # Convert to an undirected graph for checking connections
@@ -151,7 +151,7 @@ if st.sidebar.button("Calculate Route"):
     # islands = list(nx.connected_components(check_G))
     
     # if len(islands) > 1:
-        # st.sidebar.error(f"🚨 WARNING: Graph broken into {len(islands)} pieces! 🚨")
+        # st.sidebar.error(f"WARNING: Graph broken into {len(islands)} pieces!")
         
         # Sort islands by size (the biggest one is the main hospital)
         # islands.sort(key=len, reverse=True)
@@ -161,7 +161,7 @@ if st.sidebar.button("Calculate Route"):
             # floating_labels = [check_G.nodes[n].get('label', str(n)) for n in island]
             # st.sidebar.warning(f"**Disconnected Piece #{i}:**\n" + ", ".join(floating_labels))
     # else:
-        # st.sidebar.success("✅ The hospital grid is perfectly connected!")
+        # st.sidebar.success("The hospital grid is perfectly connected!")
         
 # ==========================================
 # VISUALIZATION & MULTI-FLOOR UI
@@ -172,7 +172,7 @@ if st.session_state.route_active:
     import pandas as pd
     
     # --- 1. THE NEW ROUTE COMPARISON TABLE ---
-    st.markdown("### 📊 Route Options")
+    st.markdown("### Route Options")
     
     # Build a clean dataframe for the user to read
     table_data = []
@@ -192,12 +192,12 @@ if st.session_state.route_active:
     st.markdown("---")
     
     # --- 2. THE NEW DYNAMIC DROPDOWN ---
-    # Extract the names we created in the backend (e.g., "⭐ Best Route")
+    # Extract the names we created in the backend (e.g., "Best Route")
     path_options = [r['name'] for r in st.session_state.route_data]
     
     col1, col2 = st.columns([1, 2])
     with col1:
-        selected_path_name = st.selectbox("🗺️ Select Route to Display on Map:", path_options)
+        selected_path_name = st.selectbox("Select Route to Display on Map:", path_options)
     
     path_idx = path_options.index(selected_path_name)
     active_path = st.session_state.all_paths[path_idx]
@@ -341,7 +341,7 @@ if st.session_state.route_active:
 
     # --- 6. REAL AS-BUILT REFERENCE ---
     st.markdown("---")
-    with st.expander(f"🗺️ View Original As-Built Plan for {active_floor} Floor"):
+    with st.expander(f"View Original As-Built Plan for {active_floor} Floor"):
         # Dynamically load the correct image based on the floor they are looking at!
         image_filename = f"{active_floor}_plan.jpg" 
         try:
