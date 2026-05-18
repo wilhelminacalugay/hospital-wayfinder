@@ -330,13 +330,21 @@ def build_hospital_graph(dxf_file_path):
                 if not is_existing_transit or is_new_transit:
                     G.nodes[closest]['label'] = txt
 
+    # ==========================================
+    # 3. THE "LOBBY HUB" PORTAL BUILDER
+    # ==========================================
     portals = {}
     for name, pt in destinations.items():
-        if "STAIR" in name or "ELEV" in name:
-            m = re.search(r'(.*)_(LG|UG|F\d+)$', name)
+        # Only build vertical shafts for Lobbies, Stairs, and Service Elevators
+        if "ELEVATOR_LOBBY_" in name or "STAIR_" in name or "SERVICE_ELEVATOR_" in name:
+            
+            # THE FIX: Updated RegEx to capture your new _4F format!
+            m = re.search(r'(.*)_(LG|UG|\d+F)$', name) 
+            
             if m:
                 base, floor = m.group(1), m.group(2)
-                order = {"LG":-1, "UG":0, "F1":1, "F2":2, "F3":3, "F4":4, "F5":5, "F6":6}
+                # THE FIX: Updated order mapping to use 2F, 3F, etc.
+                order = {"LG":-1, "UG":0, "2F":2, "3F":3, "4F":4, "5F":5, "6F":6} 
                 if base not in portals: portals[base] = []
                 portals[base].append((order.get(floor, 99), name, pt))
 
@@ -345,7 +353,12 @@ def build_hospital_graph(dxf_file_path):
         for i in range(len(floors)-1):
             f1_n, n1, p1 = floors[i]; f2_n, n2, p2 = floors[i+1]
             diff = abs(f2_n - f1_n)
-            cost = (diff*3.5)/SPEED_STAIR_UP if "STAIR" in base else ELEV_WAIT_TIME+ELEV_DOOR_CYCLE+(diff*ELEV_TIME_PER_FLOOR)
+            
+            if "STAIR" in base:
+                cost = (diff * 3.5) / SPEED_STAIR_UP 
+            else:
+                cost = ELEV_WAIT_TIME + ELEV_DOOR_CYCLE + (diff * ELEV_TIME_PER_FLOOR)
+                
             G.add_edge(p1, p2, weight=cost)
 
     return apply_congestion(G), destinations
@@ -379,8 +392,8 @@ def find_optimized_paths(graph, destinations, start, end, role):
         u_label = routing_G.nodes[u].get('label', '').upper()
         v_label = routing_G.nodes[v].get('label', '').upper()
         
-        u_is_transit = "ELEV_" in u_label or "STAIR_" in u_label
-        v_is_transit = "ELEV_" in v_label or "STAIR_" in v_label
+        u_is_transit = "ELEVATOR_" in u_label or "STAIR_" in u_label
+        v_is_transit = "ELEVATOR_" in v_label or "STAIR_" in v_label
         
         if u_is_transit != v_is_transit:
             d['weight'] += 50000 
@@ -435,7 +448,7 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 label = safe_G.nodes[node].get('label', '').upper()
                 
                 # FIX: Look for the underscore!
-                is_elev = "ELEV_" in label
+                is_elev = "ELEVATOR_" in label
                 is_stair = "STAIR_" in label
                 is_transit = is_elev or is_stair
                 
@@ -504,7 +517,7 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 if node_floor != current_floor:
                     transit_method = "Stairs/Elevator" 
                     # FIX: Look for the underscore for UI generation too
-                    if "ELEV_" in node_label:
+                    if "ELEVATOR_" in node_label:
                         transit_method = "Elevator"
                         uses_elev = True
                     elif "STAIR_" in node_label:
@@ -512,19 +525,18 @@ def find_optimized_paths(graph, destinations, start, end, role):
                         uses_stairs = True
                     elif j > 0:
                         prev_label = safe_G.nodes[path[j-1]].get('label', '').upper()
-                        if "ELEV_" in prev_label:
+                        if "ELEVATOR_" in prev_label:
                             transit_method = "Elevator"
                             uses_elev = True
                         elif "STAIR_" in prev_label:
                             transit_method = "Stairs"
                             uses_stairs = True
-
+                            
                     step_sequence.append(f"Take {transit_method} to {node_floor}")
                     current_floor = node_floor
                 
                 if node_label and node_label not in [start, end]:
-                    # Also ignore the lobby for "Pass by" logic
-                    if "STAIR_" not in node_label and "ELEV_" not in node_label:
+                    if "STAIR_" not in node_label and "ELEVATOR_" not in node_label:
                         step_sequence.append(f"Pass by {node_label}")
                             
             step_sequence.append(f"Arrive at {end}")
