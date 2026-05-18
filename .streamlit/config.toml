@@ -1,14 +1,11 @@
 [theme]
-# Use the Hospital's Dark Green for buttons, loading bars, and highlights
-primaryColor="#03542b"
+# Gold buttons to pop against the white and green
+primaryColor="#fcba06" 
 
-# Pure white main background
 backgroundColor="#FFFFFF"
 
-# A very light, subtle tint of the green for the sidebar so black text is readable
-secondaryBackgroundColor="#eef7f2"
+# Solid Dark Green Sidebar
+secondaryBackgroundColor="#03542b" 
 
-# Dark gray/black text for maximum readability across the whole app
+# Dark text for the MAIN page
 textColor="#262730"
-
-font="sans serif"
