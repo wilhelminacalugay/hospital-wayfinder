@@ -126,18 +126,17 @@ if st.sidebar.button("Calculate Route"):
         st.warning("Start and Destination are the same!")
         st.session_state.route_active = False
     else:
-        # Catch BOTH the text and the list of paths from our backend
-        itinerary_text, all_paths = find_optimized_paths(
+        # Catch BOTH the data dictionary and the raw paths
+        route_data, all_paths = find_optimized_paths(
             graph, destinations, start_room, end_room, selected_role
         )
         
-        if not all_paths: # If it's empty, an error occurred
-            st.error(itinerary_text)
+        if not all_paths: 
+            st.error(route_data) # If it fails, route_data holds the error message
             st.session_state.route_active = False
         else:
-            # Save the paths to the session state
             st.session_state.all_paths = all_paths
-            st.session_state.itinerary_text = itinerary_text
+            st.session_state.route_data = route_data # Save the new data!
             st.session_state.route_active = True
 
 # ==========================================
@@ -170,14 +169,36 @@ if st.sidebar.button("Calculate Route"):
 if st.session_state.route_active:
     st.success("Routes generated successfully!")
     
-    # --- 1. THE NEW ROUTE SELECTOR DROPDOWN ---
-    path_options = [f"Option {i+1}" for i in range(len(st.session_state.all_paths))]
+    import pandas as pd
+    
+    # --- 1. THE NEW ROUTE COMPARISON TABLE ---
+    st.markdown("### 📊 Route Options")
+    
+    # Build a clean dataframe for the user to read
+    table_data = []
+    for r in st.session_state.route_data:
+        table_data.append({
+            "Route Type": r['name'],
+            "Est. Time": r['time'],
+            "Turns": r['turns'],
+            "Directions": r['steps']
+        })
+        
+    df = pd.DataFrame(table_data)
+    
+    # Display it cleanly without the index numbers
+    st.table(df.set_index("Route Type")) 
+
+    st.markdown("---")
+    
+    # --- 2. THE NEW DYNAMIC DROPDOWN ---
+    # Extract the names we created in the backend (e.g., "⭐ Best Route")
+    path_options = [r['name'] for r in st.session_state.route_data]
     
     col1, col2 = st.columns([1, 2])
     with col1:
         selected_path_name = st.selectbox("🗺️ Select Route to Display on Map:", path_options)
     
-    # Grab the specific math array for the chosen option
     path_idx = path_options.index(selected_path_name)
     active_path = st.session_state.all_paths[path_idx]
     
