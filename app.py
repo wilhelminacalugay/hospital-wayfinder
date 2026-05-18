@@ -15,6 +15,22 @@ from hospital_router import build_hospital_graph, get_restrictions, find_optimiz
 # SETUP & CONFIG
 # ==========================================
 st.set_page_config(page_title="Smart Hospital Wayfinder", layout="wide")
+st.markdown(
+    """
+    <style>
+    /* Target all text inside the sidebar and make it Gold */
+    [data-testid="stSidebar"] {
+        color: #fcba06;
+    }
+    
+    /* Ensure markdown text in the sidebar also turns Gold */
+    [data-testid="stSidebar"] * {
+        color: #fcba06 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 st.title("🏥 Smart Hospital Wayfinding System")
 
 # ---------------------------------------------------------
