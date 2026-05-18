@@ -518,92 +518,83 @@ def find_optimized_paths(graph, destinations, start, end, role):
         scored_paths.sort(key=lambda x: (x['is_mixed'], x['transit_hops'], x['weight']))
         
         # ---------------------------------------------------------
-        # 3. ANTI-CLONE FILTER (Fixed to keep metadata!)
+        # 3. CATEGORY HUNTER (The Golden Picks)
         # ---------------------------------------------------------
-        logical_paths = []
+        best_route = None
+        elev_route = None
+        stair_route = None
+
+        def is_clone(new_path, approved_paths):
+            new_set = set(new_path)
+            for ap in approved_paths:
+                if ap is None: continue
+                ap_set = set(ap['path'])
+                overlap = len(new_set.intersection(ap_set)) / min(len(new_set), len(ap_set))
+                if overlap > 0.85: return True
+            return False
+
         for sp in scored_paths:
-            p = sp['path']
-            is_clone = False
-            p_set = set(p)
-            for approved_sp in logical_paths:
-                approved_set = set(approved_sp['path'])
-                overlap = len(p_set.intersection(approved_set)) / min(len(p_set), len(approved_set))
-                if overlap > 0.80:
-                    is_clone = True
-                    break
-                    
-            if not is_clone:
-                logical_paths.append(sp) # Keep the whole dictionary, not just the path!
+            path = sp['path']
+            
+            # Scan the path to see what transit it uses
+            uses_elev = any("ELEVATOR_" in safe_G.nodes[n].get('label', '').upper() for n in path)
+            uses_stair = any("STAIR_" in safe_G.nodes[n].get('label', '').upper() for n in path)
+            
+            # Slot 1: The overall Best Route (Fastest, regardless of transit)
+            if best_route is None:
+                sp['name'] = "⭐ Best Route"
+                best_route = sp
                 
-            if len(logical_paths) == 3:
-                break
+            # Slot 2: The Pure Elevator Route (No stairs allowed)
+            elif not uses_stair and elev_route is None and not is_clone(path, [best_route]):
+                sp['name'] = "🛗 Pure Elevator Route"
+                elev_route = sp
                 
-        final_paths = logical_paths
+            # Slot 3: The Pure Stairs Route (No elevators allowed)
+            elif not uses_elev and stair_route is None and not is_clone(path, [best_route, elev_route]):
+                sp['name'] = "🏃 Pure Stairs Route"
+                stair_route = sp
+
+        # Gather the routes we successfully found
+        final_paths = [p for p in [best_route, elev_route, stair_route] if p is not None]
 
         # ---------------------------------------------------------
-        # 4. ITINERARY BUILDER (Now with Time & Turns!)
+        # 4. PACKAGE DATA FOR STREAMLIT UI
         # ---------------------------------------------------------
-        output = f"[ 🗺️ WAYFINDING ITINERARY FOR {role} ]\n\n"
-        
-        for i, sp in enumerate(final_paths, 1):
+        route_data = []
+        for sp in final_paths:
             path = sp['path']
-            total_seconds = sp['weight']
-            turns = count_turns(path)
-            time_str = format_time(total_seconds)
             
+            # Format the turn-by-turn steps
             step_sequence = []
             current_floor = get_floor_from_y(path[0][1])
             step_sequence.append(f"Start at {start}")
-            
-            uses_stairs = False
-            uses_elev = False
             
             for j, node in enumerate(path):
                 node_floor = get_floor_from_y(node[1])
                 node_label = safe_G.nodes[node].get('label', '').upper()
                 
                 if node_floor != current_floor:
-                    transit_method = "Stairs/Elevator" 
-                    if "ELEVATOR_" in node_label:
-                        transit_method = "Elevator"
-                        uses_elev = True
-                    elif "STAIR_" in node_label:
-                        transit_method = "Stairs"
-                        uses_stairs = True
-                    elif j > 0:
-                        prev_label = safe_G.nodes[path[j-1]].get('label', '').upper()
-                        if "ELEVATOR_" in prev_label:
-                            transit_method = "Elevator"
-                            uses_elev = True
-                        elif "STAIR_" in prev_label:
-                            transit_method = "Stairs"
-                            uses_stairs = True
-                            
-                    step_sequence.append(f"Take {transit_method} to {node_floor}")
+                    transit = "Elevator" if "ELEVATOR_" in node_label else "Stairs" if "STAIR_" in node_label else "Transit"
+                    step_sequence.append(f"Take {transit} to {node_floor}")
                     current_floor = node_floor
                 
-                if node_label and node_label not in [start, end]:
-                    if "STAIR_" not in node_label and "ELEVATOR_" not in node_label:
-                        step_sequence.append(f"Pass by {node_label}")
+                if node_label and node_label not in [start, end] and "STAIR_" not in node_label and "ELEVATOR_" not in node_label:
+                    step_sequence.append(f"Pass by {node_label}")
                             
             step_sequence.append(f"Arrive at {end}")
             
-            if uses_stairs and uses_elev:
-                route_tag = "[Mixed: Stairs & Elevator]"
-            elif uses_stairs:
-                route_tag = "[Stairs Route]"
-            elif uses_elev:
-                route_tag = "[Elevator Route]"
-            else:
-                route_tag = "[Same Floor - Direct Walk]"
+            # Save all data securely into a dictionary
+            route_data.append({
+                'name': sp['name'],
+                'time': format_time(sp['weight']),
+                'turns': count_turns(path),
+                'steps': " ➔ ".join(step_sequence),
+                'path_coords': path
+            })
             
-            # THE NEW METRICS HEADER
-            output += f"OPTION {i} {route_tag}  ( ⏱️ {time_str} | ↪️ {turns} Turns )\n"
-            output += " ➔ ".join(step_sequence) + "\n\n"
-            
-        # We need to return just the paths to Streamlit, so we extract them here
-        just_the_paths = [sp['path'] for sp in final_paths]
-        return output, just_the_paths
+        # We now return a clean list of dictionaries instead of a giant text string!
+        return route_data, [p['path_coords'] for p in route_data]
         
     except nx.NetworkXNoPath:
         return f"[{role} ERROR] No valid path found.", []
