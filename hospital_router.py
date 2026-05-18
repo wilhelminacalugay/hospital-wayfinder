@@ -294,11 +294,26 @@ def build_hospital_graph(dxf_file_path):
         # 1. Eradicate invisible CAD typos (like double spaces)
         txt = re.sub(r'\s+', ' ', txt)
         
-        # 2. Fix the Deletion Logic
-        if txt in translations:
-            if translations[txt] == "": 
-                continue # ACTUALLY destroy the text, do not keep it!
+        # 2. THE APOLOGY FIX: If it is blank in the dictionary, KEEP THE ORIGINAL NAME.
+        if txt in translations and translations[txt] != "": 
             txt = translations[txt]
+            
+        if hasattr(entity.dxf, 'insert') and txt:
+            pos = (round(entity.dxf.insert.x, 1), round(entity.dxf.insert.y, 1))
+            if all_endpoints:
+                closest = min(all_endpoints, key=lambda pt: calculate_distance(pos, pt))
+                
+                # Always add the room to destinations so it shows up in your dropdown UI
+                destinations[txt] = closest
+                
+                # 3. Protect Transit Nodes from being overwritten by nearby rooms
+                existing_label = G.nodes[closest].get('label', '')
+                is_existing_transit = "ELEV" in existing_label or "STAIR" in existing_label
+                is_new_transit = "ELEV" in txt or "STAIR" in txt
+                
+                # Only update the graph node's label if it doesn't destroy a transit tag
+                if not is_existing_transit or is_new_transit:
+                    G.nodes[closest]['label'] = txt
             
         if hasattr(entity.dxf, 'insert') and txt:
             pos = (round(entity.dxf.insert.x, 1), round(entity.dxf.insert.y, 1))
