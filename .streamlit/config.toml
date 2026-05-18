@@ -1,15 +1,14 @@
 [theme]
-# The main accent color (used for the 'Calculate Route' button, loading bars, etc.)
-primaryColor="#dedede"
+# Use the Hospital's Dark Green for buttons, loading bars, and highlights
+primaryColor="#03542b"
 
-# The main background color of the website
+# Pure white main background
 backgroundColor="#FFFFFF"
 
-# The background color of the sidebar
-secondaryBackgroundColor="#03542b"
+# A very light, subtle tint of the green for the sidebar so black text is readable
+secondaryBackgroundColor="#eef7f2"
 
-# The color of the text
-textColor="#03542b"
+# Dark gray/black text for maximum readability across the whole app
+textColor="#262730"
 
-# Font style ("sans serif", "serif", or "monospace")
 font="sans serif"
