@@ -2,6 +2,7 @@ import streamlit as st
 import networkx as nx
 import plotly.graph_objects as go
 import textwrap
+from PIL import Image
 
 # ---------------------------------------------------------
 # THE GITHUB IMPORT FIX
@@ -72,9 +73,11 @@ def get_floor_from_coords(x, y):
     min_dist = float('inf')
     
     for floor, (ymin, ymax) in DETECTION_Y_BOUNDS.items():
+        # If it is perfectly inside the bounds, return immediately
         if ymin <= y <= ymax:
             return floor
             
+        # If it is slightly outside, calculate the distance to the nearest edge
         dist = min(abs(y - ymin), abs(y - ymax))
         if dist < min_dist:
             min_dist = dist
@@ -123,29 +126,31 @@ selected_role = st.selectbox("Select User Role", roles)
 # ==========================================
 # ROUTING CALCULATIONS
 # ==========================================
-# Changed to st.button so it's on the main page, and made it full width for mobile
 if st.button("Calculate Route", use_container_width=True):
     if start_room == end_room:
         st.warning("Start and Destination are the same!")
         st.session_state.route_active = False
     else:
+        # Catch BOTH the data dictionary and the raw paths
         route_data, all_paths = find_optimized_paths(
             graph, destinations, start_room, end_room, selected_role
         )
         
         if not all_paths: 
-            st.error(route_data) 
+            st.error(route_data) # If it fails, route_data holds the error message
             st.session_state.route_active = False
         else:
             st.session_state.all_paths = all_paths
-            st.session_state.route_data = route_data 
+            st.session_state.route_data = route_data # Save the new data!
             st.session_state.route_active = True
-
+        
 # ==========================================
 # VISUALIZATION & MULTI-FLOOR UI
 # ==========================================
 if st.session_state.route_active:
     st.success("Routes generated successfully!")
+    
+    import pandas as pd
     
     # --- 1. MOBILE-FRIENDLY ROUTE CARDS ---
     st.markdown("### Route Options")
@@ -154,12 +159,13 @@ if st.session_state.route_active:
         # This creates a visually distinct box for each route option
         with st.container(border=True):
             st.markdown(f"#### {r['name']}")
-            st.markdown(f"**Est. Time:** {r['time']} &nbsp; | &nbsp; **Turns:** {r['turns']}")
+            st.markdown(f"**⏱️ Est. Time:** {r['time']} &nbsp; | &nbsp; **↪️ Turns:** {r['turns']}")
             st.caption(r['steps'])
 
     st.markdown("---")
     
     # --- 2. THE NEW DYNAMIC DROPDOWN ---
+    # Extract the names we created in the backend (e.g., "Best Route")
     path_options = [r['name'] for r in st.session_state.route_data]
     
     col1, col2 = st.columns([1, 2])
@@ -207,7 +213,7 @@ if st.session_state.route_active:
     # --- 5. PLOTLY MAP VISUALIZATION ---
     fig = go.Figure()
     
-    # DRAW THE BLUEPRINT
+    # DRAW THE BLUEPRINT (BACKGROUND SKELETON)
     edge_x = []
     edge_y = []
     for u, v in graph.edges():
@@ -223,7 +229,7 @@ if st.session_state.route_active:
         name='Hospital Layout'
     ))
 
-    # DRAW THE WAYFINDING NODES
+    # DRAW THE WAYFINDING NODES (BLUE DOTS)
     node_x = []
     node_y = []
     for n in graph.nodes():
@@ -235,11 +241,11 @@ if st.session_state.route_active:
         x=node_x, y=node_y,
         mode='markers',
         marker=dict(size=4, color='blue', opacity=0.4),
-        hoverinfo='x+y',
+        hoverinfo='x+y', 
         name='Wayfinding Nodes'
     ))
 
-    # DRAW THE NAMED DESTINATIONS
+    # DRAW THE NAMED DESTINATIONS (ORANGE DOTS WITH TEXT)
     dest_x = []
     dest_y = []
     dest_names = []
@@ -289,8 +295,8 @@ if st.session_state.route_active:
         
     # MOBILE-FRIENDLY MAP UNLOCKED FOR ZOOM & PAN
     fig.update_layout(
-        xaxis=dict(showgrid=False, zeroline=False, visible=False, fixedrange=False), # Unlocked
-        yaxis=dict(showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1, fixedrange=False), # Unlocked
+        xaxis=dict(showgrid=False, zeroline=False, visible=False, fixedrange=False), 
+        yaxis=dict(showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1, fixedrange=False), 
         margin=dict(l=0, r=0, t=0, b=0),
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
@@ -306,7 +312,6 @@ if st.session_state.route_active:
     with st.expander(f"View Original As-Built Plan for {active_floor} Floor"):
         image_filename = f"{active_floor}_plan.jpg" 
         try:
-            from PIL import Image
             # Open the image file to read its natural width and height
             img = Image.open(image_filename)
             img_w, img_h = img.size
