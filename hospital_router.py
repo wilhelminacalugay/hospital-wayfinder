@@ -396,10 +396,19 @@ def build_hospital_graph(dxf_file_path):
 def get_restrictions(role):
     """
     Returns a list of text keywords that the selected role is FORBIDDEN from entering.
-    Currently set to allow EVERYTHING for all roles (Development Mode).
     """
-    # By returning an empty list for everyone, no nodes are ever removed from the graph.
-    # Every role (Patient, PWD, Staff, etc.) has full access to Stairs, Elevators, and all rooms.
+    if role == "PATIENT" or role == "VISITOR":
+        # Block them from staff areas, doctor's lounges, morgue, and operating rooms
+        return ["STAFF", "DOCTOR", "NURSE", "O.R.", "OPERATING", "DELIVERY", "MORGUE", "STORAGE", "MAINTENANCE", "JANITOR"]
+        
+    elif role == "PWD":
+        # PWD gets the same restrictions as a patient, but we ALSO block all stairs!
+        return ["STAFF", "DOCTOR", "NURSE", "O.R.", "OPERATING", "DELIVERY", "MORGUE", "STORAGE", "MAINTENANCE", "JANITOR", "STAIR"]
+        
+    elif role == "NURSE" or role == "DOCTOR" or role == "STAFF":
+        # Hospital employees have an all-access pass (empty list means no restrictions)
+        return []
+        
     return []
 
 # --- THE FULLY ASSEMBLED SMART ITINERARY GENERATOR ---
