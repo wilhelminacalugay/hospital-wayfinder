@@ -108,26 +108,26 @@ if st.sidebar.button("Calculate Route"):
 # ==========================================
 # 🛠️ TEMPORARY DEBUG TOOLS
 # ==========================================
-st.sidebar.markdown("---")
-if st.sidebar.button("🔍 Run Island Finder"):
-    import networkx as nx
+# st.sidebar.markdown("---")
+# if st.sidebar.button("🔍 Run Island Finder"):
+    # import networkx as nx
     
     # Convert to an undirected graph for checking connections
-    check_G = graph.to_undirected()
-    islands = list(nx.connected_components(check_G))
+    # check_G = graph.to_undirected()
+    # islands = list(nx.connected_components(check_G))
     
-    if len(islands) > 1:
-        st.sidebar.error(f"🚨 WARNING: Graph broken into {len(islands)} pieces! 🚨")
+    # if len(islands) > 1:
+        # st.sidebar.error(f"🚨 WARNING: Graph broken into {len(islands)} pieces! 🚨")
         
         # Sort islands by size (the biggest one is the main hospital)
-        islands.sort(key=len, reverse=True)
+        # islands.sort(key=len, reverse=True)
         
         # Print the disconnected rooms directly to the sidebar
-        for i, island in enumerate(islands[1:], 1):
-            floating_labels = [check_G.nodes[n].get('label', str(n)) for n in island]
-            st.sidebar.warning(f"**Disconnected Piece #{i}:**\n" + ", ".join(floating_labels))
-    else:
-        st.sidebar.success("✅ The hospital grid is perfectly connected!")
+        # for i, island in enumerate(islands[1:], 1):
+            # floating_labels = [check_G.nodes[n].get('label', str(n)) for n in island]
+            # st.sidebar.warning(f"**Disconnected Piece #{i}:**\n" + ", ".join(floating_labels))
+    # else:
+        # st.sidebar.success("✅ The hospital grid is perfectly connected!")
         
 # ==========================================
 # VISUALIZATION & MULTI-FLOOR UI
