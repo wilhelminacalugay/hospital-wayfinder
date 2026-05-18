@@ -348,3 +348,7 @@ if st.session_state.route_active:
             st.image(image_filename, caption=f"Original CAD Blueprint - {active_floor} Floor", use_container_width=True)
         except FileNotFoundError:
             st.warning(f"Please upload '{image_filename}' to the project folder to view it here.")
+    # --- 7. DEVELOPER X-RAY VISION ---
+    st.markdown("---")
+    with st.expander("🛠️ Developer Mode: View Raw Routing Math"):
+        st.write(st.session_state.route_data)
