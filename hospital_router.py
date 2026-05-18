@@ -291,10 +291,10 @@ def build_hospital_graph(dxf_file_path):
     for entity in msp.query('TEXT MTEXT'):
         txt = entity.plain_text().strip().upper() if entity.dxftype() == 'MTEXT' else entity.dxf.text.strip().upper()
         
-        # 1. Eradicate invisible CAD typos (like double spaces)
+        # Eradicate invisible CAD typos
         txt = re.sub(r'\s+', ' ', txt)
         
-        # 2. THE APOLOGY FIX: If it is blank in the dictionary, KEEP THE ORIGINAL NAME.
+        # If it is blank in the dictionary, KEEP THE ORIGINAL NAME.
         if txt in translations and translations[txt] != "": 
             txt = translations[txt]
             
@@ -303,15 +303,13 @@ def build_hospital_graph(dxf_file_path):
             if all_endpoints:
                 closest = min(all_endpoints, key=lambda pt: calculate_distance(pos, pt))
                 
-                # Always add the room to destinations so it shows up in your dropdown UI
                 destinations[txt] = closest
                 
-                # 3. Protect Transit Nodes from being overwritten by nearby rooms
+                # 3. FIX: Only protect actual shafts (using the underscore!)
                 existing_label = G.nodes[closest].get('label', '')
-                is_existing_transit = "ELEV" in existing_label or "STAIR" in existing_label
-                is_new_transit = "ELEV" in txt or "STAIR" in txt
+                is_existing_transit = "ELEV_" in existing_label or "STAIR_" in existing_label
+                is_new_transit = "ELEV_" in txt or "STAIR_" in txt
                 
-                # Only update the graph node's label if it doesn't destroy a transit tag
                 if not is_existing_transit or is_new_transit:
                     G.nodes[closest]['label'] = txt
             
@@ -375,14 +373,14 @@ def find_optimized_paths(graph, destinations, start, end, role):
     if s_node not in safe_G or e_node not in safe_G:
         return f"Access Denied: This route crosses through restricted areas for a {role}.", []
 
-    # 1. POISON THE GRAPH (Penalize Transit Boarding)
+    # 1. POISON THE GRAPH (Using Underscores!)
     routing_G = safe_G.copy()
     for u, v, d in routing_G.edges(data=True):
         u_label = routing_G.nodes[u].get('label', '').upper()
         v_label = routing_G.nodes[v].get('label', '').upper()
         
-        u_is_transit = "ELEV" in u_label or "STAIR" in u_label
-        v_is_transit = "ELEV" in v_label or "STAIR" in v_label
+        u_is_transit = "ELEV_" in u_label or "STAIR_" in u_label
+        v_is_transit = "ELEV_" in v_label or "STAIR_" in v_label
         
         if u_is_transit != v_is_transit:
             d['weight'] += 50000 
@@ -435,8 +433,10 @@ def find_optimized_paths(graph, destinations, start, end, role):
             
             for node in p:
                 label = safe_G.nodes[node].get('label', '').upper()
-                is_elev = "ELEV" in label
-                is_stair = "STAIR" in label
+                
+                # FIX: Look for the underscore!
+                is_elev = "ELEV_" in label
+                is_stair = "STAIR_" in label
                 is_transit = is_elev or is_stair
                 
                 if is_elev: uses_elev = True
@@ -446,7 +446,6 @@ def find_optimized_paths(graph, destinations, start, end, role):
                     transit_hops += 1
                 was_on_transit = is_transit
             
-            # THE HARD BAN: If they hop onto transit more than once, KILL IT.
             if transit_hops > 1:
                 continue
             
@@ -504,18 +503,19 @@ def find_optimized_paths(graph, destinations, start, end, role):
                 
                 if node_floor != current_floor:
                     transit_method = "Stairs/Elevator" 
-                    if "ELEV" in node_label:
+                    # FIX: Look for the underscore for UI generation too
+                    if "ELEV_" in node_label:
                         transit_method = "Elevator"
                         uses_elev = True
-                    elif "STAIR" in node_label:
+                    elif "STAIR_" in node_label:
                         transit_method = "Stairs"
                         uses_stairs = True
                     elif j > 0:
                         prev_label = safe_G.nodes[path[j-1]].get('label', '').upper()
-                        if "ELEV" in prev_label:
+                        if "ELEV_" in prev_label:
                             transit_method = "Elevator"
                             uses_elev = True
-                        elif "STAIR" in prev_label:
+                        elif "STAIR_" in prev_label:
                             transit_method = "Stairs"
                             uses_stairs = True
 
@@ -523,7 +523,8 @@ def find_optimized_paths(graph, destinations, start, end, role):
                     current_floor = node_floor
                 
                 if node_label and node_label not in [start, end]:
-                    if "STAIR" not in node_label and "ELEV" not in node_label:
+                    # Also ignore the lobby for "Pass by" logic
+                    if "STAIR_" not in node_label and "ELEV_" not in node_label:
                         step_sequence.append(f"Pass by {node_label}")
                             
             step_sequence.append(f"Arrive at {end}")
