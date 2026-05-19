@@ -117,7 +117,6 @@ current_ph_time = datetime.datetime.now(ph_tz)
 current_hour = current_ph_time.hour
 
 # Define Hospital Peak Hours (Military Time)
-# e.g., Morning Rush (8-10 AM), Lunch (12 PM), Afternoon Rush (4-5 PM)
 peak_hours = [8, 9, 10, 12, 16, 17]
 is_peak_hour = current_hour in peak_hours
 
@@ -133,18 +132,27 @@ with col_traffic:
     else:
         st.success("Normal Flow (Off-Peak Hours)")
 
-# 3. Fetch restrictions from the backend for this specific role
+# 3. TEMPORAL ROLE-BASED ACCESS CONTROL (VISITING HOURS)
+# 10:00 AM (10) to 10:00 PM (21:59 -> hour 21). 
+is_visiting_hours = 10 <= current_hour < 22 
+
+if selected_role == "VISITOR" and not is_visiting_hours:
+    # Display a clear warning and halt the app completely for this user
+    st.error(f"**Visiting Hours Closed.** Visitors are strictly allowed only between 10:00 AM and 10:00 PM. (Current time: {current_ph_time.strftime('%I:%M %p')})")
+    st.stop()
+
+# 4. Fetch restrictions from the backend for this specific role
 raw_restrictions = get_restrictions(selected_role)
 restricted_nodes = raw_restrictions[0] if isinstance(raw_restrictions, tuple) else raw_restrictions
 
-# 4. Dynamically filter the room list
+# 5. Dynamically filter the room list
 allowed_room_names = []
 for name, coords in destinations.items():
     if name not in restricted_nodes and coords not in restricted_nodes:
         allowed_room_names.append(name)
 allowed_room_names = sorted(allowed_room_names)
 
-# 5. Display the pre-filtered dropdowns
+# 6. Display the pre-filtered dropdowns
 col1, col2 = st.columns(2)
 with col1:
     start_room = st.selectbox("Starting Point", allowed_room_names, index=0)
