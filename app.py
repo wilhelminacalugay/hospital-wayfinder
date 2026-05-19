@@ -241,8 +241,11 @@ if st.session_state.route_active:
         if get_floor_from_coords(pt[0], pt[1]) == active_floor:
             dest_x.append(pt[0])
             dest_y.append(pt[1])
-            wrapped_lines = textwrap.wrap(name, width=15)[:3] 
+            
+            # FIX: Widened from 15 to 30 characters so the text breathes horizontally
+            wrapped_lines = textwrap.wrap(name, width=30)[:2] 
             wrapped_text = "<br>".join(wrapped_lines) 
+            
             dest_names.append(wrapped_text)
 
     # UPDATED: Node names to dark blue
