@@ -270,14 +270,14 @@ if st.session_state.route_active:
             hoverinfo='none'
         ))
         
-        # UPDATED: Yellow Start, Dark Green End, Black Text, Black Dot Border
+        # UPDATED: Yellow Start, Dark Green End, Black Text positioned below the dots
         fig.add_trace(go.Scatter(
             x=[path_x[0], path_x[-1]], 
             y=[path_y[0], path_y[-1]],
             mode='markers+text',
             marker=dict(color=['yellow', 'darkgreen'], size=[14, 14], line=dict(color='black', width=2)),
             text=['Start Here', 'End Here'],
-            textposition="top center",
+            textposition="bottom center", # <--- Changed this to push text down
             textfont=dict(size=14, color="black"),
             name='Anchor Points',
             hoverinfo='none'
