@@ -106,18 +106,33 @@ if 'route_segments' not in st.session_state:
 # ==========================================
 # USER INTERFACE (MOBILE/DESKTOP MAIN PAGE)
 # ==========================================
-st.markdown("### Where do you need to go?")
+st.markdown("### Navigation Setup")
 
+# 1. Ask for the Role FIRST
 roles = ["PATIENT", "VISITOR", "NURSE", "DOCTOR", "STAFF", "PWD"]
-room_names = sorted(list(destinations.keys()))
+selected_role = st.selectbox("Select User Role", roles)
 
+# 2. Fetch restrictions from the backend for this specific role
+restricted_nodes, restricted_edges = get_restrictions(selected_role)
+
+# 3. Dynamically filter the room list
+allowed_room_names = []
+for name, coords in destinations.items():
+    # Only add the room to the dropdown if its coordinate is NOT on the restricted list
+    if coords not in restricted_nodes:
+        allowed_room_names.append(name)
+
+# Sort them alphabetically for the user
+allowed_room_names = sorted(allowed_room_names)
+
+# 4. Display the pre-filtered dropdowns
 col1, col2 = st.columns(2)
 with col1:
-    start_room = st.selectbox("Starting Point", room_names, index=0)
+    start_room = st.selectbox("Starting Point", allowed_room_names, index=0)
 with col2:
-    end_room = st.selectbox("Destination", room_names, index=1)
-
-selected_role = st.selectbox("Select User Role", roles)
+    # Safely set the default destination index so it doesn't break if the list is small
+    default_end = 1 if len(allowed_room_names) > 1 else 0
+    end_room = st.selectbox("Destination", allowed_room_names, index=default_end)
 
 # ==========================================
 # ROUTING CALCULATIONS
