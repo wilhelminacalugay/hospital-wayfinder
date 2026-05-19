@@ -92,18 +92,6 @@ def count_turns(path):
         if angle > 45: turns += 1
     return turns
 
-def apply_congestion(G):
-    ph_time = datetime.now(timezone(timedelta(hours=8)))
-    hour = ph_time.hour
-    is_peak = any(start <= hour < end for start, end in PEAK_HOURS)
-    
-    if is_peak:
-        for u, v, data in G.edges(data=True):
-            labels = [G.nodes[u].get('label', ''), G.nodes[v].get('label', '')]
-            if any(k in "".join(labels) for k in ["LOBBY", "WAITING", "MAIN ROAD", "ENTRY"]):
-                data['weight'] *= CONGESTION_PENALTY
-    return G
-
 def build_hospital_graph(dxf_file_path):
     try:
         doc = ezdxf.readfile(dxf_file_path)
@@ -252,7 +240,6 @@ def build_hospital_graph(dxf_file_path):
     # ==========================================
     lines_by_layer = {}
     for entity in msp.query('LWPOLYLINE LINE'):
-        # THIS is where layer_name is officially defined!
         layer_name = entity.dxf.layer.upper() 
         
         if layer_name not in lines_by_layer:
@@ -285,10 +272,8 @@ def build_hospital_graph(dxf_file_path):
                 all_endpoints.update([coords[i], coords[i+1]])
 
     # ---------------------------------------------------------
-    # 🚨 NEW: THE NODE FUSION ALGORITHM (CAD SLOP FIX)
+    # 🚨 THE NODE FUSION ALGORITHM (CAD SLOP FIX)
     # ---------------------------------------------------------
-    # Set this to your CAD tolerance. If your CAD is in millimeters, 
-    # 100.0 means it will snap gaps up to 10cm apart.
     TOLERANCE = 50.0 
     
     mapping = {}
@@ -303,28 +288,22 @@ def build_hospital_graph(dxf_file_path):
             if other in mapping: 
                 continue
             if calculate_distance(n, other) <= TOLERANCE:
-                mapping[other] = n # Magnetically map 'other' to 'n'
+                mapping[other] = n 
                 
-    # Fuse the graph together
     G = nx.relabel_nodes(G, mapping, copy=True)
-    G.remove_edges_from(nx.selfloop_edges(G)) # Destroy overlapping stubs
+    G.remove_edges_from(nx.selfloop_edges(G))
     
-    # Update the endpoints so the text parser snaps to the fixed grid
     all_endpoints = set(G.nodes())
     # ---------------------------------------------------------
 
-
     # ==========================================
-    # 3. PARSE TEXT LABELS (Leave this part exactly as you have it)
+    # 3. PARSE TEXT LABELS
     # ==========================================
     for entity in msp.query('TEXT MTEXT'):
-        # ... (rest of your text code) ...
         txt = entity.plain_text().strip().upper() if entity.dxftype() == 'MTEXT' else entity.dxf.text.strip().upper()
         
-        # Eradicate invisible CAD typos
         txt = re.sub(r'\s+', ' ', txt)
         
-        # If it is blank in the dictionary, KEEP THE ORIGINAL NAME.
         if txt in translations and translations[txt] != "": 
             txt = translations[txt]
             
@@ -335,45 +314,24 @@ def build_hospital_graph(dxf_file_path):
                 
                 destinations[txt] = closest
                 
-                # 3. FIX: Only protect actual shafts (using the underscore!)
-                existing_label = G.nodes[closest].get('label', '')
-                is_existing_transit = "ELEV_" in existing_label or "STAIR_" in existing_label
-                is_new_transit = "ELEV_" in txt or "STAIR_" in txt
-                
-                if not is_existing_transit or is_new_transit:
-                    G.nodes[closest]['label'] = txt
-            
-        if hasattr(entity.dxf, 'insert') and txt:
-            pos = (round(entity.dxf.insert.x, 1), round(entity.dxf.insert.y, 1))
-            if all_endpoints:
-                closest = min(all_endpoints, key=lambda pt: calculate_distance(pos, pt))
-                
-                # Always add the room to destinations so it can be searched
-                destinations[txt] = closest
-                
-                # 3. Protect Transit Nodes from being overwritten by nearby rooms
                 existing_label = G.nodes[closest].get('label', '')
                 is_existing_transit = "ELEV" in existing_label or "STAIR" in existing_label
                 is_new_transit = "ELEV" in txt or "STAIR" in txt
                 
-                # Only update the graph node's label if it doesn't destroy a transit tag
                 if not is_existing_transit or is_new_transit:
                     G.nodes[closest]['label'] = txt
 
     # ==========================================
-    # 3. THE "LOBBY HUB" PORTAL BUILDER
+    # 4. THE "LOBBY HUB" PORTAL BUILDER
     # ==========================================
     portals = {}
     for name, pt in destinations.items():
-        # Only build vertical shafts for Lobbies, Stairs, and Service Elevators
         if "ELEVATOR_LOBBY_" in name or "STAIR_" in name or "SERVICE_ELEVATOR_" in name:
             
-            # THE FIX: Updated RegEx to capture your new _4F format!
             m = re.search(r'(.*)_(LG|UG|\d+F)$', name) 
             
             if m:
                 base, floor = m.group(1), m.group(2)
-                # THE FIX: Updated order mapping to use 2F, 3F, etc.
                 order = {"LG":-1, "UG":0, "2F":2, "3F":3, "4F":4, "5F":5, "6F":6} 
                 if base not in portals: portals[base] = []
                 portals[base].append((order.get(floor, 99), name, pt))
@@ -391,41 +349,40 @@ def build_hospital_graph(dxf_file_path):
                 
             G.add_edge(p1, p2, weight=cost)
 
-    return apply_congestion(G), destinations
+    return G, destinations
 
 def get_restrictions(role):
     """
     Returns a list of text keywords that the selected role is FORBIDDEN from entering.
     """
     if role == "PATIENT" or role == "VISITOR":
-        # Block them from staff areas, doctor's lounges, morgue, and operating rooms
         return ["STAFF", "DOCTOR", "NURSE", "O.R.", "OPERATING", "DELIVERY", "MORGUE", "STORAGE", "MAINTENANCE", "JANITOR"]
         
     elif role == "PWD":
-        # PWD gets the same restrictions as a patient, but we ALSO block all stairs!
         return ["STAFF", "DOCTOR", "NURSE", "O.R.", "OPERATING", "DELIVERY", "MORGUE", "STORAGE", "MAINTENANCE", "JANITOR", "STAIR"]
         
     elif role == "NURSE" or role == "DOCTOR" or role == "STAFF":
-        # Hospital employees have an all-access pass (empty list means no restrictions)
         return []
         
     return []
 
 # --- THE FULLY ASSEMBLED SMART ITINERARY GENERATOR ---
-def find_optimized_paths(graph, destinations, start, end, role):
-    if start not in destinations or end not in destinations:
+def find_optimized_paths(graph, destinations, start_room, end_room, user_role, is_peak_hour=False):
+    if start_room not in destinations or end_room not in destinations:
         return "Start or Destination not found in database.", []
 
-    s_node, e_node = destinations[start], destinations[end]
-    restricted = [n for n, d in graph.nodes(data=True) if any(k in d.get('label','') for k in get_restrictions(role))]
+    s_node, e_node = destinations[start_room], destinations[end_room]
+    restricted = [n for n, d in graph.nodes(data=True) if any(k in d.get('label','') for k in get_restrictions(user_role))]
     
     safe_G = graph.copy()
     safe_G.remove_nodes_from(restricted)
     
     if s_node not in safe_G or e_node not in safe_G:
-        return f"Access Denied: This route crosses through restricted areas for a {role}.", []
+        return f"Access Denied: This route crosses through restricted areas for a {user_role}.", []
 
-    # 1. POISON THE GRAPH (Using Underscores!)
+    # =========================================================
+    # 1. POISON THE GRAPH & APPLY CONGESTION
+    # =========================================================
     routing_G = safe_G.copy()
     for u, v, d in routing_G.edges(data=True):
         u_label = routing_G.nodes[u].get('label', '').upper()
@@ -434,8 +391,15 @@ def find_optimized_paths(graph, destinations, start, end, role):
         u_is_transit = "ELEVATOR_" in u_label or "STAIR_" in u_label
         v_is_transit = "ELEVATOR_" in v_label or "STAIR_" in v_label
         
+        # Prevent elevator/stair node jumping
         if u_is_transit != v_is_transit:
             d['weight'] += 50000 
+            
+        # THE NEW CONGESTION PENALTY (Equation 2)
+        if is_peak_hour:
+            # If neither node is a transit node, it is a horizontal hallway. Apply 35% delay!
+            if not u_is_transit and not v_is_transit:
+                d['weight'] = d['weight'] * CONGESTION_PENALTY
 
     try:
         raw_paths = list(itertools.islice(nx.shortest_simple_paths(routing_G, s_node, e_node, weight='weight'), 50))
@@ -581,7 +545,7 @@ def find_optimized_paths(graph, destinations, start, end, role):
             # Format the turn-by-turn steps
             step_sequence = []
             current_floor = get_floor_from_y(path[0][1])
-            step_sequence.append(f"Start at {start}")
+            step_sequence.append(f"Start at {start_room}")
             
             for j, node in enumerate(path):
                 node_floor = get_floor_from_y(node[1])
@@ -592,10 +556,10 @@ def find_optimized_paths(graph, destinations, start, end, role):
                     step_sequence.append(f"Take {transit} to {node_floor}")
                     current_floor = node_floor
                 
-                if node_label and node_label not in [start, end] and "STAIR_" not in node_label and "ELEVATOR_" not in node_label:
+                if node_label and node_label not in [start_room, end_room] and "STAIR_" not in node_label and "ELEVATOR_" not in node_label:
                     step_sequence.append(f"Pass by {node_label}")
                             
-            step_sequence.append(f"Arrive at {end}")
+            step_sequence.append(f"Arrive at {end_room}")
             
             # Save all data securely into a dictionary
             route_data.append({
@@ -610,6 +574,4 @@ def find_optimized_paths(graph, destinations, start, end, role):
         return route_data, [p['path_coords'] for p in route_data]
         
     except nx.NetworkXNoPath:
-        return f"[{role} ERROR] No valid path found.", []
-
-# We removed the terminal while loop at the bottom because Streamlit handles the interface now!
+        return f"[{user_role} ERROR] No valid path found.", []
