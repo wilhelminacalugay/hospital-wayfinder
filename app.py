@@ -104,7 +104,7 @@ if "CONFERENCE ROOM" in destinations:
 if "CHIEF OF CLINICS" in destinations:
     current_x, current_y = destinations["CHIEF OF CLINICS"]
     # Adjust these numbers to slide the dot exactly where it belongs
-    destinations["CHIEF OF CLINICS"] = (current_x + 6000, current_y) # Moves it 3 meters LEFT
+    destinations["CHIEF OF CLINICS"] = (current_x + 4000, current_y) # Moves it 3 meters LEFT
 
 if graph is None:
     st.error("Failed to load the hospital network. Check your DXF file path.")
