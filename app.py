@@ -271,7 +271,7 @@ if st.session_state.route_active:
         x=dest_x, y=dest_y,
         mode='markers+text',
         text=dest_names,
-        textposition="top center",
+        textposition="middle right", # <--- Pushes text to the side to stop vertical mashing
         textfont=dict(size=9, color="darkblue"),
         marker=dict(size=6, color='darkblue', opacity=0.8),
         hoverinfo='none',
