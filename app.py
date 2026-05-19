@@ -27,7 +27,7 @@ st.markdown(
         color: #fcba06 !important;
     }
 
-    /* 1. Changes the text color of the currently SELECTED option in the main page dropdown to GOLD */
+    /* Changes the text color of the currently SELECTED option in the main page dropdown to GOLD */
     div[data-baseweb="select"] > div {
         color: #fcba06 !important; 
     }
@@ -37,12 +37,12 @@ st.markdown(
         color: #fcba06 !important; 
     }
     
-    /* 2. Keeps the list of options in the POP-OUT menu dark green so they are readable against a white background */
+    /* Keeps the list of options in the POP-OUT menu dark green */
     ul[role="listbox"] li {
         color: #03542b !important; 
     }
     
-    /* Optional: Changes the background color of the option you hover over */
+    /* Changes the background color of the option you hover over */
     ul[role="listbox"] li:hover {
         background-color: #eef7f2 !important;
         color: #03542b !important;
@@ -67,7 +67,6 @@ DETECTION_Y_BOUNDS = {
 }
 
 def get_floor_from_coords(x, y):
-    """Magnetically snaps coordinates to the closest floor to prevent fake bounces."""
     best_floor = "UG"
     min_dist = float('inf')
     
@@ -105,9 +104,9 @@ if 'route_segments' not in st.session_state:
     st.session_state.route_segments = []
 
 # ==========================================
-# USER INTERFACE (MOBILE-FRIENDLY MAIN PAGE)
+# USER INTERFACE (MOBILE/DESKTOP MAIN PAGE)
 # ==========================================
-st.markdown("### 📍 Where do you need to go?")
+st.markdown("### Where do you need to go?")
 
 roles = ["PATIENT", "VISITOR", "NURSE", "DOCTOR", "STAFF", "PWD"]
 room_names = sorted(list(destinations.keys()))
@@ -146,25 +145,23 @@ if st.button("Calculate Route", use_container_width=True):
 if st.session_state.route_active:
     st.success("Routes generated successfully!")
     
-    import pandas as pd
-    
-    # --- 1. MOBILE-FRIENDLY ROUTE CARDS ---
-    st.markdown("### 📊 Route Options")
+    # --- 1. ROUTE CARDS ---
+    st.markdown("### Route Options")
     
     for r in st.session_state.route_data:
         with st.container(border=True):
             st.markdown(f"#### {r['name']}")
-            st.markdown(f"**⏱️ Est. Time:** {r['time']} &nbsp; | &nbsp; **↪️ Turns:** {r['turns']}")
+            st.markdown(f"**Est. Time:** {r['time']} &nbsp; | &nbsp; **Turns:** {r['turns']}")
             st.caption(r['steps'])
 
     st.markdown("---")
     
-    # --- 2. THE NEW DYNAMIC DROPDOWN ---
+    # --- 2. DYNAMIC DROPDOWN ---
     path_options = [r['name'] for r in st.session_state.route_data]
     
     col1, col2 = st.columns([1, 2])
     with col1:
-        selected_path_name = st.selectbox("🗺️ Select Route to Display on Map:", path_options)
+        selected_path_name = st.selectbox("Select Route to Display on Map:", path_options)
     
     path_idx = path_options.index(selected_path_name)
     active_path = st.session_state.all_paths[path_idx]
@@ -207,7 +204,6 @@ if st.session_state.route_active:
     # --- 5. PLOTLY MAP VISUALIZATION ---
     fig = go.Figure()
     
-    # DRAW THE BLUEPRINT 
     edge_x = []
     edge_y = []
     for u, v in graph.edges():
@@ -223,7 +219,6 @@ if st.session_state.route_active:
         name='Hospital Layout'
     ))
 
-    # DRAW THE WAYFINDING NODES
     node_x = []
     node_y = []
     for n in graph.nodes():
@@ -239,7 +234,6 @@ if st.session_state.route_active:
         name='Wayfinding Nodes'
     ))
 
-    # DRAW THE NAMED DESTINATIONS
     dest_x = []
     dest_y = []
     dest_names = []
@@ -262,7 +256,6 @@ if st.session_state.route_active:
         name='Destinations'
     ))
         
-    # DRAW THE OPTIMAL ROUTE
     path_x = active_segment['x']
     path_y = active_segment['y']
     
@@ -287,7 +280,6 @@ if st.session_state.route_active:
             hoverinfo='none'
         ))
         
-    # 🔴 FULLY UNLOCKED ROUTE MAP
     fig.update_layout(
         xaxis=dict(showgrid=False, zeroline=False, visible=False, fixedrange=False), 
         yaxis=dict(showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1, fixedrange=False), 
@@ -295,15 +287,15 @@ if st.session_state.route_active:
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         showlegend=False,
-        dragmode="pan",
-        hovermode=False # Disables hover popups that interrupt mobile tapping
+        dragmode="zoom", 
+        hovermode=False 
     )
     
-    st.plotly_chart(fig, use_container_width=True, height=600, config={'scrollZoom': True, 'displayModeBar': False})
+    st.plotly_chart(fig, use_container_width=True, height=600, config={'displayModeBar': True, 'displaylogo': False})
 
     # --- 6. REAL AS-BUILT REFERENCE ---
     st.markdown("---")
-    with st.expander(f"🗺️ View Original As-Built Plan for {active_floor} Floor"):
+    with st.expander(f"View Original As-Built Plan for {active_floor} Floor"):
         image_filename = f"{active_floor}_plan.jpg" 
         try:
             img = Image.open(image_filename)
@@ -322,7 +314,6 @@ if st.session_state.route_active:
                 )
             )
             
-            # 🔴 FULLY UNLOCKED BLUEPRINT MAP
             fig_blueprint.update_layout(
                 xaxis=dict(range=[0, img_w], showgrid=False, zeroline=False, visible=False, fixedrange=False),
                 yaxis=dict(range=[0, img_h], showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1, fixedrange=False),
@@ -330,18 +321,17 @@ if st.session_state.route_active:
                 plot_bgcolor="rgba(0,0,0,0)",
                 paper_bgcolor="rgba(0,0,0,0)",
                 showlegend=False,
-                dragmode="pan",
+                dragmode="zoom",
                 height=500,
                 hovermode=False
             )
             
-            st.plotly_chart(fig_blueprint, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
-            st.info("💡 **Tip:** Double-tap the map to reset the view.")
+            st.plotly_chart(fig_blueprint, use_container_width=True, config={'displayModeBar': True, 'displaylogo': False})
             
         except FileNotFoundError:
             st.warning(f"Please upload '{image_filename}' to the project folder to view it here.")
             
     # --- 7. DEVELOPER X-RAY VISION ---
     st.markdown("---")
-    with st.expander("🛠️ Developer Mode: View Raw Routing Math"):
+    with st.expander("Developer Mode: View Raw Routing Math"):
         st.write(st.session_state.route_data)
