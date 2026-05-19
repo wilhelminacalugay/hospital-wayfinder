@@ -113,13 +113,16 @@ roles = ["PATIENT", "VISITOR", "NURSE", "DOCTOR", "STAFF", "PWD"]
 selected_role = st.selectbox("Select User Role", roles)
 
 # 2. Fetch restrictions from the backend for this specific role
-restricted_nodes, restricted_edges = get_restrictions(selected_role)
+raw_restrictions = get_restrictions(selected_role)
+
+# Safely extract the restricted nodes, whether the backend returns 1 item or a tuple
+restricted_nodes = raw_restrictions[0] if isinstance(raw_restrictions, tuple) else raw_restrictions
 
 # 3. Dynamically filter the room list
 allowed_room_names = []
 for name, coords in destinations.items():
-    # Only add the room to the dropdown if its coordinate is NOT on the restricted list
-    if coords not in restricted_nodes:
+    # Check against both the name AND the coordinates to be absolutely safe
+    if name not in restricted_nodes and coords not in restricted_nodes:
         allowed_room_names.append(name)
 
 # Sort them alphabetically for the user
