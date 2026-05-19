@@ -193,7 +193,7 @@ if st.session_state.route_active:
     for r in st.session_state.route_data:
         with st.container(border=True):
             st.markdown(f"#### {r['name']}")
-            st.markdown(f"**Est. Time:** {r['time']} &nbsp; | &nbsp; **Turns:** {r['turns']}")
+            st.markdown(f"**Est. Time:** {r['time']} &nbsp; | &nbsp; **Distance:** {r['distance']} &nbsp; | &nbsp; **Turns:** {r['turns']}")
             st.caption(r['steps'])
 
     st.markdown("---")
