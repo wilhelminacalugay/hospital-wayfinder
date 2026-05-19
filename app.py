@@ -2,7 +2,7 @@ import streamlit as st
 import networkx as nx
 import plotly.graph_objects as go
 import textwrap
-import base64
+from PIL import Image
 
 # ---------------------------------------------------------
 # THE GITHUB IMPORT FIX
@@ -55,7 +55,6 @@ st.title("Ospital ng Parañaque - District II Wayfinding System")
 
 # ---------------------------------------------------------
 # DETECTION BOUNDS (RAW CAD LIMITS FOR THE SLICER)
-# We ONLY need these now to slice the multi-floor route!
 # ---------------------------------------------------------
 DETECTION_Y_BOUNDS = {
     "LG": [-170844.5250, -159463.4517],
@@ -73,11 +72,9 @@ def get_floor_from_coords(x, y):
     min_dist = float('inf')
     
     for floor, (ymin, ymax) in DETECTION_Y_BOUNDS.items():
-        # If it is perfectly inside the bounds, return immediately
         if ymin <= y <= ymax:
             return floor
             
-        # If it is slightly outside, calculate the distance to the nearest edge
         dist = min(abs(y - ymin), abs(y - ymax))
         if dist < min_dist:
             min_dist = dist
@@ -110,7 +107,7 @@ if 'route_segments' not in st.session_state:
 # ==========================================
 # USER INTERFACE (MOBILE-FRIENDLY MAIN PAGE)
 # ==========================================
-st.markdown("### Where do you need to go?")
+st.markdown("### 📍 Where do you need to go?")
 
 roles = ["PATIENT", "VISITOR", "NURSE", "DOCTOR", "STAFF", "PWD"]
 room_names = sorted(list(destinations.keys()))
@@ -131,17 +128,16 @@ if st.button("Calculate Route", use_container_width=True):
         st.warning("Start and Destination are the same!")
         st.session_state.route_active = False
     else:
-        # Catch BOTH the data dictionary and the raw paths
         route_data, all_paths = find_optimized_paths(
             graph, destinations, start_room, end_room, selected_role
         )
         
         if not all_paths: 
-            st.error(route_data) # If it fails, route_data holds the error message
+            st.error(route_data) 
             st.session_state.route_active = False
         else:
             st.session_state.all_paths = all_paths
-            st.session_state.route_data = route_data # Save the new data!
+            st.session_state.route_data = route_data 
             st.session_state.route_active = True
         
 # ==========================================
@@ -153,10 +149,9 @@ if st.session_state.route_active:
     import pandas as pd
     
     # --- 1. MOBILE-FRIENDLY ROUTE CARDS ---
-    st.markdown("### Route Options")
+    st.markdown("### 📊 Route Options")
     
     for r in st.session_state.route_data:
-        # This creates a visually distinct box for each route option
         with st.container(border=True):
             st.markdown(f"#### {r['name']}")
             st.markdown(f"**⏱️ Est. Time:** {r['time']} &nbsp; | &nbsp; **↪️ Turns:** {r['turns']}")
@@ -165,17 +160,16 @@ if st.session_state.route_active:
     st.markdown("---")
     
     # --- 2. THE NEW DYNAMIC DROPDOWN ---
-    # Extract the names we created in the backend (e.g., "Best Route")
     path_options = [r['name'] for r in st.session_state.route_data]
     
     col1, col2 = st.columns([1, 2])
     with col1:
-        selected_path_name = st.selectbox("Select Route to Display on Map:", path_options)
+        selected_path_name = st.selectbox("🗺️ Select Route to Display on Map:", path_options)
     
     path_idx = path_options.index(selected_path_name)
     active_path = st.session_state.all_paths[path_idx]
     
-    # --- 3. DYNAMIC SLICER (Runs on the selected option) ---
+    # --- 3. DYNAMIC SLICER ---
     segments = []
     first_x, first_y = active_path[0][0], active_path[0][1]
     current_floor = get_floor_from_coords(first_x, first_y)
@@ -213,7 +207,7 @@ if st.session_state.route_active:
     # --- 5. PLOTLY MAP VISUALIZATION ---
     fig = go.Figure()
     
-    # DRAW THE BLUEPRINT (BACKGROUND SKELETON)
+    # DRAW THE BLUEPRINT 
     edge_x = []
     edge_y = []
     for u, v in graph.edges():
@@ -229,7 +223,7 @@ if st.session_state.route_active:
         name='Hospital Layout'
     ))
 
-    # DRAW THE WAYFINDING NODES (BLUE DOTS)
+    # DRAW THE WAYFINDING NODES
     node_x = []
     node_y = []
     for n in graph.nodes():
@@ -241,11 +235,11 @@ if st.session_state.route_active:
         x=node_x, y=node_y,
         mode='markers',
         marker=dict(size=4, color='blue', opacity=0.4),
-        hoverinfo='x+y', 
+        hoverinfo='none', 
         name='Wayfinding Nodes'
     ))
 
-    # DRAW THE NAMED DESTINATIONS (ORANGE DOTS WITH TEXT)
+    # DRAW THE NAMED DESTINATIONS
     dest_x = []
     dest_y = []
     dest_names = []
@@ -253,10 +247,8 @@ if st.session_state.route_active:
         if get_floor_from_coords(pt[0], pt[1]) == active_floor:
             dest_x.append(pt[0])
             dest_y.append(pt[1])
-            
             wrapped_lines = textwrap.wrap(name, width=15)[:3] 
             wrapped_text = "<br>".join(wrapped_lines) 
-            
             dest_names.append(wrapped_text)
 
     fig.add_trace(go.Scatter(
@@ -266,7 +258,7 @@ if st.session_state.route_active:
         textposition="top center",
         textfont=dict(size=9, color="orange"),
         marker=dict(size=6, color='orange', opacity=0.8),
-        hoverinfo='text',
+        hoverinfo='none',
         name='Destinations'
     ))
         
@@ -279,7 +271,8 @@ if st.session_state.route_active:
             x=path_x, y=path_y,
             mode='lines',
             line=dict(color='red', width=5),
-            name=f'{active_floor} Route'
+            name=f'{active_floor} Route',
+            hoverinfo='none'
         ))
         
         fig.add_trace(go.Scatter(
@@ -290,59 +283,65 @@ if st.session_state.route_active:
             text=['Start Here', 'End Here'],
             textposition="top center",
             textfont=dict(size=14, color="white"),
-            name='Anchor Points'
+            name='Anchor Points',
+            hoverinfo='none'
         ))
         
-        # MOBILE-FRIENDLY MAP (Locked on page to prevent scroll-hijacking)
+    # 🔴 FULLY UNLOCKED ROUTE MAP
     fig.update_layout(
-        xaxis=dict(showgrid=False, zeroline=False, visible=False, fixedrange=True), 
-        yaxis=dict(showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1, fixedrange=True), 
+        xaxis=dict(showgrid=False, zeroline=False, visible=False, fixedrange=False), 
+        yaxis=dict(showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1, fixedrange=False), 
         margin=dict(l=0, r=0, t=0, b=0),
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         showlegend=False,
-        dragmode=False # Completely disables panning so the page can scroll normally
+        dragmode="pan",
+        hovermode=False # Disables hover popups that interrupt mobile tapping
     )
     
-    st.plotly_chart(fig, use_container_width=True, height=600, config={'displayModeBar': False})
+    st.plotly_chart(fig, use_container_width=True, height=600, config={'scrollZoom': True, 'displayModeBar': False})
 
-        # --- 6. REAL AS-BUILT REFERENCE ---
+    # --- 6. REAL AS-BUILT REFERENCE ---
     st.markdown("---")
-    with st.expander(f"View Original As-Built Plan for {active_floor} Floor"):
+    with st.expander(f"🗺️ View Original As-Built Plan for {active_floor} Floor"):
         image_filename = f"{active_floor}_plan.jpg" 
         try:
-            # 1. Convert the image into a raw web string (Base64)
-            with open(image_filename, "rb") as image_file:
-                encoded_string = base64.b64encode(image_file.read()).decode()
+            img = Image.open(image_filename)
+            img_w, img_h = img.size
             
-            # 2. Create a custom button styled with your hospital's branding
-            html_string = f"""
-            <a href="data:image/jpeg;base64,{encoded_string}" target="_blank" style="
-                display: block;
-                width: 100%;
-                padding: 12px;
-                background-color: #03542b;
-                color: #fcba06;
-                text-align: center;
-                text-decoration: none;
-                font-weight: bold;
-                border-radius: 8px;
-                font-family: sans-serif;
-                margin-bottom: 15px;
-                ">
-                Open Full Blueprint to Zoom
-            </a>
-            """
+            fig_blueprint = go.Figure()
+            fig_blueprint.add_layout_image(
+                dict(
+                    source=img,
+                    xref="x", yref="y",
+                    x=0, y=img_h,      
+                    sizex=img_w,
+                    sizey=img_h,
+                    sizing="stretch",
+                    layer="below"
+                )
+            )
             
-            # 3. Display the button and a small preview
-            st.markdown(html_string, unsafe_allow_html=True)
-            st.caption("Tap the button above to open the map in a new tab for perfect zooming.")
-            st.image(image_filename, use_container_width=True)
+            # 🔴 FULLY UNLOCKED BLUEPRINT MAP
+            fig_blueprint.update_layout(
+                xaxis=dict(range=[0, img_w], showgrid=False, zeroline=False, visible=False, fixedrange=False),
+                yaxis=dict(range=[0, img_h], showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1, fixedrange=False),
+                margin=dict(l=0, r=0, t=0, b=0),
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                showlegend=False,
+                dragmode="pan",
+                height=500,
+                hovermode=False
+            )
+            
+            st.plotly_chart(fig_blueprint, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
+            st.info("💡 **Tip:** Double-tap the map to reset the view.")
             
         except FileNotFoundError:
             st.warning(f"Please upload '{image_filename}' to the project folder to view it here.")
             
     # --- 7. DEVELOPER X-RAY VISION ---
     st.markdown("---")
-    with st.expander("Developer Mode: View Raw Routing Math"):
+    with st.expander("🛠️ Developer Mode: View Raw Routing Math"):
         st.write(st.session_state.route_data)
