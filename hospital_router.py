@@ -254,7 +254,7 @@ def build_hospital_graph(dxf_file_path):
                 if pts[i] != pts[i+1]: lines_by_layer[layer_name].append(LineString([pts[i], pts[i+1]]))
 
     # ==========================================
-    # 2. MERGE & BUILD GRAPH BY LAYER
+    # 2. MERGE & BUILD GRAPH BY LAYER (NOW WITH DISTANCE)
     # ==========================================
     for layer_name, raw_lines in lines_by_layer.items(): 
         merged = unary_union(raw_lines)
@@ -267,7 +267,8 @@ def build_hospital_graph(dxf_file_path):
                 
                 G.add_node(coords[i], layer=layer_name)
                 G.add_node(coords[i+1], layer=layer_name)
-                G.add_edge(coords[i], coords[i+1], weight=dist_m / SPEED_FLAT)
+                # ADDED: explicitly storing the physical distance for display later
+                G.add_edge(coords[i], coords[i+1], weight=dist_m / SPEED_FLAT, distance=dist_m)
                 
                 all_endpoints.update([coords[i], coords[i+1]])
 
@@ -343,11 +344,14 @@ def build_hospital_graph(dxf_file_path):
             diff = abs(f2_n - f1_n)
             
             if "STAIR" in base:
-                cost = (diff * 3.5) / SPEED_STAIR_UP 
+                phys_dist = diff * 3.5 # Standard 3.5m floor height estimation
+                cost = phys_dist / SPEED_STAIR_UP 
+                # ADDED: Store vertical physical distance for stairs
+                G.add_edge(p1, p2, weight=cost, distance=phys_dist)
             else:
                 cost = ELEV_WAIT_TIME + ELEV_DOOR_CYCLE + (diff * ELEV_TIME_PER_FLOOR)
-                
-            G.add_edge(p1, p2, weight=cost)
+                # ADDED: Store 0 distance for elevators (standing still)
+                G.add_edge(p1, p2, weight=cost, distance=0.0)
 
     return G, destinations
 
@@ -450,7 +454,6 @@ def find_optimized_paths(graph, destinations, start_room, end_room, user_role, i
             for node in p:
                 label = safe_G.nodes[node].get('label', '').upper()
                 
-                # FIX: Look for the underscore!
                 is_elev = "ELEVATOR_" in label
                 is_stair = "STAIR_" in label
                 is_transit = is_elev or is_stair
@@ -466,13 +469,20 @@ def find_optimized_paths(graph, destinations, start_room, end_room, user_role, i
                 pass # DEBUG: We disabled the Transit Transfer kill switch!
             
             is_mixed = 1 if (uses_elev and uses_stair) else 0
-            real_weight = sum(safe_G[p[i]][p[i+1]]['weight'] for i in range(len(p)-1))
+            
+            # Use original uncongested graph (or congested graph) for the weight display
+            # Wait, let's use the routing_G but subtract the 50000 penalty so congestion shows up in UI
+            real_weight = sum(routing_G[p[i]][p[i+1]]['weight'] % 50000 for i in range(len(p)-1))
+            
+            # ADDED: Mathematically sum up the physical distance!
+            real_distance = sum(safe_G[p[i]][p[i+1]].get('distance', 0) for i in range(len(p)-1))
             
             scored_paths.append({
                 'path': p,
                 'transit_hops': transit_hops,
                 'is_mixed': is_mixed,
-                'weight': real_weight
+                'weight': real_weight,
+                'distance': real_distance # NEW ATTRIBUTE SAVED HERE
             })
             
         if not scored_paths:
@@ -565,6 +575,7 @@ def find_optimized_paths(graph, destinations, start_room, end_room, user_role, i
             route_data.append({
                 'name': sp['name'],
                 'time': format_time(sp['weight']),
+                'distance': f"{round(sp['distance'], 1)} m", # ADDED: The UI string ready to display!
                 'turns': count_turns(path),
                 'steps': " ➔ ".join(step_sequence),
                 'path_coords': path
