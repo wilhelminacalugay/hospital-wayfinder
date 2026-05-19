@@ -98,13 +98,13 @@ graph, destinations = load_network()
 # 1. Fix the Overlap: Push Conference Room UP so it stops mashing with Secretary
 if "CONFERENCE ROOM" in destinations:
     current_x, current_y = destinations["CONFERENCE ROOM"]
-    destinations["CONFERENCE ROOM"] = (current_x + 800, current_y - 800)
+    destinations["CONFERENCE ROOM"] = (current_x +, current_y)
 
 # 2. Fix the Misplaced Node: Slide Chief of Clinics to the correct intersection
 if "CHIEF OF CLINICS" in destinations:
     current_x, current_y = destinations["CHIEF OF CLINICS"]
     # Adjust these numbers to slide the dot exactly where it belongs
-    destinations["CHIEF OF CLINICS"] = (current_x -500, current_y)
+    destinations["CHIEF OF CLINICS"] = (current_x, current_y)
 
 if graph is None:
     st.error("Failed to load the hospital network. Check your DXF file path.")
