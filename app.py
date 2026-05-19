@@ -98,7 +98,7 @@ graph, destinations = load_network()
 # 1. Fix the Overlap: Push Conference Room UP so it stops mashing with Secretary
 if "CONFERENCE ROOM" in destinations:
     current_x, current_y = destinations["CONFERENCE ROOM"]
-    destinations["CONFERENCE ROOM"] = (current_x +, current_y)
+    destinations["CONFERENCE ROOM"] = (current_x, current_y)
 
 # 2. Fix the Misplaced Node: Slide Chief of Clinics to the correct intersection
 if "CHIEF OF CLINICS" in destinations:
