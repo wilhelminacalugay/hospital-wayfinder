@@ -109,29 +109,40 @@ if 'route_segments' not in st.session_state:
 # ==========================================
 st.markdown("### Navigation Setup")
 
-# 1. Ask for Role and Traffic Conditions FIRST
+# 1. LIVE TIME FETCHING (PHILIPPINE TIME)
+ph_tz = pytz.timezone('Asia/Manila')
+current_ph_time = datetime.datetime.now(ph_tz)
+current_hour = current_ph_time.hour
+
+# Define Hospital Peak Hours (Military Time)
+# e.g., Morning Rush (8-10 AM), Lunch (12 PM), Afternoon Rush (4-5 PM)
+peak_hours = [8, 9, 10, 12, 16, 17]
+is_peak_hour = current_hour in peak_hours
+
+# 2. Ask for Role and Display Automated Traffic
 col_role, col_traffic = st.columns(2)
 with col_role:
     roles = ["PATIENT", "VISITOR", "NURSE", "DOCTOR", "STAFF", "PWD"]
     selected_role = st.selectbox("Select User Role", roles)
 with col_traffic:
-    # This fulfills Objective 3.2.2 (Time-Dependent Congestion)
-    traffic_conditions = ["Normal (Off-Peak)", "High Congestion (Peak Hours)"]
-    selected_traffic = st.selectbox("Current Hospital Traffic", traffic_conditions)
-    is_peak_hour = True if selected_traffic == "High Congestion (Peak Hours)" else False
+    st.markdown("**Live Hospital Traffic**")
+    if is_peak_hour:
+        st.error("🔴 High Congestion (Peak Hours Active)")
+    else:
+        st.success("🟢 Normal Flow (Off-Peak Hours)")
 
-# 2. Fetch restrictions from the backend for this specific role
+# 3. Fetch restrictions from the backend for this specific role
 raw_restrictions = get_restrictions(selected_role)
 restricted_nodes = raw_restrictions[0] if isinstance(raw_restrictions, tuple) else raw_restrictions
 
-# 3. Dynamically filter the room list
+# 4. Dynamically filter the room list
 allowed_room_names = []
 for name, coords in destinations.items():
     if name not in restricted_nodes and coords not in restricted_nodes:
         allowed_room_names.append(name)
 allowed_room_names = sorted(allowed_room_names)
 
-# 4. Display the pre-filtered dropdowns
+# 5. Display the pre-filtered dropdowns
 col1, col2 = st.columns(2)
 with col1:
     start_room = st.selectbox("Starting Point", allowed_room_names, index=0)
