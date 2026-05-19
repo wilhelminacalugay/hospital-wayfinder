@@ -245,13 +245,14 @@ if st.session_state.route_active:
             wrapped_text = "<br>".join(wrapped_lines) 
             dest_names.append(wrapped_text)
 
+    # UPDATED: Node names to dark blue
     fig.add_trace(go.Scatter(
         x=dest_x, y=dest_y,
         mode='markers+text',
         text=dest_names,
         textposition="top center",
-        textfont=dict(size=9, color="orange"),
-        marker=dict(size=6, color='orange', opacity=0.8),
+        textfont=dict(size=9, color="darkblue"),
+        marker=dict(size=6, color='darkblue', opacity=0.8),
         hoverinfo='none',
         name='Destinations'
     ))
@@ -260,22 +261,24 @@ if st.session_state.route_active:
     path_y = active_segment['y']
     
     if len(path_x) > 0:
+        # UPDATED: Route line to black
         fig.add_trace(go.Scatter(
             x=path_x, y=path_y,
             mode='lines',
-            line=dict(color='red', width=5),
+            line=dict(color='black', width=5),
             name=f'{active_floor} Route',
             hoverinfo='none'
         ))
         
+        # UPDATED: Yellow Start, Dark Green End, Black Text, Black Dot Border
         fig.add_trace(go.Scatter(
             x=[path_x[0], path_x[-1]], 
             y=[path_y[0], path_y[-1]],
             mode='markers+text',
-            marker=dict(color=['green', 'blue'], size=[14, 14], line=dict(color='white', width=2)),
+            marker=dict(color=['yellow', 'darkgreen'], size=[14, 14], line=dict(color='black', width=2)),
             text=['Start Here', 'End Here'],
             textposition="top center",
-            textfont=dict(size=14, color="white"),
+            textfont=dict(size=14, color="black"),
             name='Anchor Points',
             hoverinfo='none'
         ))
@@ -292,6 +295,9 @@ if st.session_state.route_active:
     )
     
     st.plotly_chart(fig, use_container_width=True, height=600, config={'displayModeBar': True, 'displaylogo': False})
+    
+    # ADDED: Double-tap reminder for the Main Route Map
+    st.info("**Tip:** Double-tap the map to reset the zoom view.")
 
     # --- 6. REAL AS-BUILT REFERENCE ---
     st.markdown("---")
@@ -327,6 +333,9 @@ if st.session_state.route_active:
             )
             
             st.plotly_chart(fig_blueprint, use_container_width=True, config={'displayModeBar': True, 'displaylogo': False})
+            
+            # ADDED: Double-tap reminder for the Blueprint Map
+            st.info("**Tip:** Double-tap the map to reset the zoom view.")
             
         except FileNotFoundError:
             st.warning(f"Please upload '{image_filename}' to the project folder to view it here.")
