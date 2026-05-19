@@ -91,24 +91,18 @@ def load_network():
 
 graph, destinations = load_network()
 
-# MANUAL CAD NUDGES
-# X controls Left/Right (+ is Right, - is Left)
-# Y controls Up/Down (+ is Up, - is Down)
-
-# 1. Fix the Overlap: Push Conference Room UP so it stops mashing with Secretary
-if "CONFERENCE ROOM" in destinations:
-    current_x, current_y = destinations["CONFERENCE ROOM"]
-    destinations["CONFERENCE ROOM"] = (current_x, current_y)
-
-# 2. Fix the Misplaced Node: Slide Chief of Clinics to the correct intersection
-if "CHIEF OF CLINICS" in destinations:
-    current_x, current_y = destinations["CHIEF OF CLINICS"]
-    # Adjust these numbers to slide the dot exactly where it belongs
-    destinations["CHIEF OF CLINICS"] = (current_x, current_y)
-
 if graph is None:
     st.error("Failed to load the hospital network. Check your DXF file path.")
     st.stop()
+
+# VISUAL ONLY MAP NUDGES
+# Format: "ROOM NAME": (X_shift, Y_shift)
+# This ONLY moves the dot on the screen, so the routing math never breaks!
+VISUAL_NUDGES = {
+    "CONFERENCE ROOM": (0, 1500),    # Positive Y moves it UP away from Secretary
+    "CHIEF OF CLINICS": (-3000, 0),  # Negative X moves it LEFT
+    # Add as many rooms here as you need later!
+}
 
 # ==========================================
 # STATE MANAGEMENT
@@ -272,13 +266,20 @@ if st.session_state.route_active:
     dest_names = []
     for name, pt in destinations.items():
         if get_floor_from_coords(pt[0], pt[1]) == active_floor:
-            dest_x.append(pt[0])
-            dest_y.append(pt[1])
+            # 1. Grab the true mathematical coordinate
+            plot_x, plot_y = pt[0], pt[1]
             
-            # FIX: Widened from 15 to 30 characters so the text breathes horizontally
+            # 2. If the room is in our visual nudge list, shift it!
+            if name in VISUAL_NUDGES:
+                nudge_x, nudge_y = VISUAL_NUDGES[name]
+                plot_x += nudge_x
+                plot_y += nudge_y
+                
+            dest_x.append(plot_x)
+            dest_y.append(plot_y)
+            
             wrapped_lines = textwrap.wrap(name, width=30)[:2] 
             wrapped_text = "<br>".join(wrapped_lines) 
-            
             dest_names.append(wrapped_text)
 
     # UPDATED: Node names to dark blue
