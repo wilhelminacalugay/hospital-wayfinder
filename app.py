@@ -2,6 +2,7 @@ import streamlit as st
 import networkx as nx
 import plotly.graph_objects as go
 import textwrap
+import base64
 
 # ---------------------------------------------------------
 # THE GITHUB IMPORT FIX
@@ -307,10 +308,35 @@ if st.session_state.route_active:
 
         # --- 6. REAL AS-BUILT REFERENCE ---
     st.markdown("---")
-    with st.expander(f"🗺️ View Original As-Built Plan for {active_floor} Floor"):
+    with st.expander(f"View Original As-Built Plan for {active_floor} Floor"):
         image_filename = f"{active_floor}_plan.jpg" 
         try:
-            st.info("💡 Tip: Tap the fullscreen arrows (⛶) in the top right of the image below to enable pinch-to-zoom!")
+            # 1. Convert the image into a raw web string (Base64)
+            with open(image_filename, "rb") as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode()
+            
+            # 2. Create a custom button styled with your hospital's branding
+            html_string = f"""
+            <a href="data:image/jpeg;base64,{encoded_string}" target="_blank" style="
+                display: block;
+                width: 100%;
+                padding: 12px;
+                background-color: #03542b;
+                color: #fcba06;
+                text-align: center;
+                text-decoration: none;
+                font-weight: bold;
+                border-radius: 8px;
+                font-family: sans-serif;
+                margin-bottom: 15px;
+                ">
+                Open Full Blueprint to Zoom
+            </a>
+            """
+            
+            # 3. Display the button and a small preview
+            st.markdown(html_string, unsafe_allow_html=True)
+            st.caption("Tap the button above to open the map in a new tab for perfect zooming.")
             st.image(image_filename, use_container_width=True)
             
         except FileNotFoundError:
