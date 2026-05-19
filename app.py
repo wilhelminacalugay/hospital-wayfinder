@@ -129,9 +129,9 @@ with col_role:
 with col_traffic:
     st.markdown("**Live Hospital Traffic**")
     if is_peak_hour:
-        st.error("🔴 High Congestion (Peak Hours Active)")
+        st.error("High Congestion (Peak Hours Active)")
     else:
-        st.success("🟢 Normal Flow (Off-Peak Hours)")
+        st.success("Normal Flow (Off-Peak Hours)")
 
 # 3. Fetch restrictions from the backend for this specific role
 raw_restrictions = get_restrictions(selected_role)
