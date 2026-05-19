@@ -11,9 +11,9 @@ from itertools import islice
 # ==========================================
 # LITERATURE & ASSUMPTION VALUES 
 # ==========================================
-SPEED_FLAT = 1.4 
-SPEED_STAIR_UP = 0.5 
-SPEED_STAIR_DOWN = 0.7 
+SPEED_FLAT = 1.18 
+SPEED_STAIR_UP = 0.4 
+SPEED_STAIR_DOWN = 0.4 
 
 ELEV_WAIT_TIME = 45.0 
 ELEV_DOOR_CYCLE = 12.0
