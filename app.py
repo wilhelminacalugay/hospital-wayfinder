@@ -109,9 +109,16 @@ if 'route_segments' not in st.session_state:
 # ==========================================
 st.markdown("### Navigation Setup")
 
-# 1. Ask for the Role FIRST
-roles = ["PATIENT", "VISITOR", "NURSE", "DOCTOR", "STAFF", "PWD"]
-selected_role = st.selectbox("Select User Role", roles)
+# 1. Ask for Role and Traffic Conditions FIRST
+col_role, col_traffic = st.columns(2)
+with col_role:
+    roles = ["PATIENT", "VISITOR", "NURSE", "DOCTOR", "STAFF", "PWD"]
+    selected_role = st.selectbox("Select User Role", roles)
+with col_traffic:
+    # This fulfills Objective 3.2.2 (Time-Dependent Congestion)
+    traffic_conditions = ["Normal (Off-Peak)", "High Congestion (Peak Hours)"]
+    selected_traffic = st.selectbox("Current Hospital Traffic", traffic_conditions)
+    is_peak_hour = True if selected_traffic == "High Congestion (Peak Hours)" else False
 
 # 2. Fetch restrictions from the backend for this specific role
 raw_restrictions = get_restrictions(selected_role)
@@ -122,8 +129,6 @@ allowed_room_names = []
 for name, coords in destinations.items():
     if name not in restricted_nodes and coords not in restricted_nodes:
         allowed_room_names.append(name)
-
-# Sort them alphabetically for the user
 allowed_room_names = sorted(allowed_room_names)
 
 # 4. Display the pre-filtered dropdowns
@@ -142,8 +147,9 @@ if st.button("Calculate Route", use_container_width=True):
         st.warning("Start and Destination are the same!")
         st.session_state.route_active = False
     else:
+        # UPDATED: We are now passing `is_peak_hour` to your backend engine!
         route_data, all_paths = find_optimized_paths(
-            graph, destinations, start_room, end_room, selected_role
+            graph, destinations, start_room, end_room, selected_role, is_peak_hour
         )
         
         if not all_paths: 
