@@ -91,14 +91,14 @@ def load_network():
 
 graph, destinations = load_network()
 
-# 🛠️ MANUAL CAD NUDGES
+# MANUAL CAD NUDGES
 # X controls Left/Right (+ is Right, - is Left)
 # Y controls Up/Down (+ is Up, - is Down)
 
 # 1. Fix the Overlap: Push Conference Room UP so it stops mashing with Secretary
 if "CONFERENCE ROOM" in destinations:
     current_x, current_y = destinations["CONFERENCE ROOM"]
-    destinations["CONFERENCE ROOM"] = (current_x, current_y + 1500) # Moves it 1.5 meters UP
+    destinations["CONFERENCE ROOM"] = (current_x + 1500, current_y)
 
 # 2. Fix the Misplaced Node: Slide Chief of Clinics to the correct intersection
 if "CHIEF OF CLINICS" in destinations:
