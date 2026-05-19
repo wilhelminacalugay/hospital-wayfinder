@@ -86,6 +86,7 @@ def get_floor_from_coords(x, y):
 # ==========================================
 @st.cache_resource
 def load_network():
+    # NO OVERRIDES HERE. The engine relies 100% on your CAD file.
     graph, destinations = build_hospital_graph("new block.dxf") 
     return graph, destinations
 
@@ -94,15 +95,6 @@ graph, destinations = load_network()
 if graph is None:
     st.error("Failed to load the hospital network. Check your DXF file path.")
     st.stop()
-
-# VISUAL ONLY MAP NUDGES
-# Format: "ROOM NAME": (X_shift, Y_shift)
-# This ONLY moves the dot on the screen, so the routing math never breaks!
-VISUAL_NUDGES = {
-    "CONFERENCE ROOM": (0, 1500),    # Positive Y moves it UP away from Secretary
-    "CHIEF OF CLINICS": (-3000, 0),  # Negative X moves it LEFT
-    # Add as many rooms here as you need later!
-}
 
 # ==========================================
 # STATE MANAGEMENT
@@ -123,14 +115,11 @@ selected_role = st.selectbox("Select User Role", roles)
 
 # 2. Fetch restrictions from the backend for this specific role
 raw_restrictions = get_restrictions(selected_role)
-
-# Safely extract the restricted nodes, whether the backend returns 1 item or a tuple
 restricted_nodes = raw_restrictions[0] if isinstance(raw_restrictions, tuple) else raw_restrictions
 
 # 3. Dynamically filter the room list
 allowed_room_names = []
 for name, coords in destinations.items():
-    # Check against both the name AND the coordinates to be absolutely safe
     if name not in restricted_nodes and coords not in restricted_nodes:
         allowed_room_names.append(name)
 
@@ -142,7 +131,6 @@ col1, col2 = st.columns(2)
 with col1:
     start_room = st.selectbox("Starting Point", allowed_room_names, index=0)
 with col2:
-    # Safely set the default destination index so it doesn't break if the list is small
     default_end = 1 if len(allowed_room_names) > 1 else 0
     end_room = st.selectbox("Destination", allowed_room_names, index=default_end)
 
@@ -266,28 +254,19 @@ if st.session_state.route_active:
     dest_names = []
     for name, pt in destinations.items():
         if get_floor_from_coords(pt[0], pt[1]) == active_floor:
-            # 1. Grab the true mathematical coordinate
-            plot_x, plot_y = pt[0], pt[1]
+            dest_x.append(pt[0])
+            dest_y.append(pt[1])
             
-            # 2. If the room is in our visual nudge list, shift it!
-            if name in VISUAL_NUDGES:
-                nudge_x, nudge_y = VISUAL_NUDGES[name]
-                plot_x += nudge_x
-                plot_y += nudge_y
-                
-            dest_x.append(plot_x)
-            dest_y.append(plot_y)
-            
+            # WIDENED text to 30 characters so names do not stack vertically
             wrapped_lines = textwrap.wrap(name, width=30)[:2] 
             wrapped_text = "<br>".join(wrapped_lines) 
             dest_names.append(wrapped_text)
 
-    # UPDATED: Node names to dark blue
     fig.add_trace(go.Scatter(
         x=dest_x, y=dest_y,
         mode='markers+text',
         text=dest_names,
-        textposition="middle right", # <--- Pushes text to the side to stop vertical mashing
+        textposition="middle right", # Pushed to the side to avoid pancake overlaps
         textfont=dict(size=9, color="darkblue"),
         marker=dict(size=6, color='darkblue', opacity=0.8),
         hoverinfo='none',
@@ -298,7 +277,6 @@ if st.session_state.route_active:
     path_y = active_segment['y']
     
     if len(path_x) > 0:
-        # UPDATED: Route line to black
         fig.add_trace(go.Scatter(
             x=path_x, y=path_y,
             mode='lines',
@@ -307,14 +285,13 @@ if st.session_state.route_active:
             hoverinfo='none'
         ))
         
-        # UPDATED: Yellow Start, Dark Green End, Black Text positioned below the dots
         fig.add_trace(go.Scatter(
             x=[path_x[0], path_x[-1]], 
             y=[path_y[0], path_y[-1]],
             mode='markers+text',
             marker=dict(color=['yellow', 'darkgreen'], size=[14, 14], line=dict(color='black', width=2)),
             text=['Start Here', 'End Here'],
-            textposition="bottom center", # <--- Changed this to push text down
+            textposition="bottom center", # Pushed text down below the dots
             textfont=dict(size=14, color="black"),
             name='Anchor Points',
             hoverinfo='none'
@@ -324,7 +301,7 @@ if st.session_state.route_active:
         xaxis=dict(showgrid=False, zeroline=False, visible=False, fixedrange=False), 
         yaxis=dict(showgrid=False, zeroline=False, visible=False, scaleanchor="x", scaleratio=1, fixedrange=False), 
         margin=dict(l=0, r=0, t=0, b=0),
-        plot_bgcolor="#eef7f2",
+        plot_bgcolor="#eef7f2", # Light green map background
         paper_bgcolor="#eef7f2",
         showlegend=False,
         dragmode="zoom", 
@@ -333,7 +310,6 @@ if st.session_state.route_active:
     
     st.plotly_chart(fig, use_container_width=True, height=600, config={'displayModeBar': True, 'displaylogo': False})
     
-    # ADDED: Double-tap reminder for the Main Route Map
     st.info("**Tip:** Double-tap the map to reset the zoom view.")
 
     # --- 6. REAL AS-BUILT REFERENCE ---
@@ -371,7 +347,6 @@ if st.session_state.route_active:
             
             st.plotly_chart(fig_blueprint, use_container_width=True, config={'displayModeBar': True, 'displaylogo': False})
             
-            # ADDED: Double-tap reminder for the Blueprint Map
             st.info("**Tip:** Double-tap the map to reset the zoom view.")
             
         except FileNotFoundError:
